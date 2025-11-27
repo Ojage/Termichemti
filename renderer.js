@@ -74,55 +74,70 @@ if (themeSelect) {
   });
 }
 
-// === Sidebar Navigation ===
-const navItems = document.querySelectorAll('.nav-item');
-const sections = document.querySelectorAll('.section');
+// === Activity Bar Navigation ===
+const activityBarItems = document.querySelectorAll('.activity-bar-item[data-view]');
+const sidebarViews = document.querySelectorAll('.sidebar-view');
 
-navItems.forEach(item => {
+activityBarItems.forEach(item => {
   item.addEventListener('click', () => {
-    const targetSection = item.getAttribute('data-section');
+    const targetView = item.getAttribute('data-view');
 
-    // Cleanup before switching
-    cleanup();
-
-    // Update active nav item
-    navItems.forEach(nav => nav.classList.remove('active'));
+    // Update active activity bar item
+    activityBarItems.forEach(nav => nav.classList.remove('active'));
     item.classList.add('active');
 
-    // Update active section
-    sections.forEach(section => section.classList.remove('active'));
-    const activeSection = document.getElementById(`${targetSection}-section`);
-    if (activeSection) {
-      activeSection.classList.add('active');
-      currentSection = targetSection;
+    // Update active sidebar view
+    sidebarViews.forEach(view => view.classList.remove('active'));
+    const activeView = document.getElementById(`${targetView}-view`);
+    if (activeView) {
+      activeView.classList.add('active');
+      currentSection = targetView;
     }
 
-    // Initialize section-specific functionality
-    if (targetSection === 'available' && scanBtn) {
-      initializeAvailableNetworksSection();
+    // Initialize view-specific functionality
+    if (targetView === 'available') {
+      // Auto-scan when switching to available networks
+      setTimeout(() => {
+        if (scanNetworksBtn && !availableTree.querySelector('.tree-item')) {
+          scanForNetworks();
+        }
+      }, 100);
+    } else if (targetView === 'diagnostics') {
+      showDiagnosticsPanel();
     }
 
-    logMessage(`Navigated to: ${targetSection}`, 'info');
+    logMessage(`Navigated to: ${targetView}`, 'info');
   });
 });
 
+// Settings button from activity bar
+const settingsActivityBtn = document.getElementById('settings-activity-btn');
+if (settingsActivityBtn) {
+  settingsActivityBtn.addEventListener('click', openSettings);
+}
+
 // === Existing Code ===
-const wifiListContainer = document.getElementById('wifi-list-container');
-const headerSubtitle = document.getElementById('header-subtitle');
-const loader = document.getElementById('loader');
-const searchContainer = document.getElementById('search-container');
-const searchInput = document.getElementById('search-input');
-const clearSearchBtn = document.getElementById('clear-search');
-const searchStats = document.getElementById('search-stats');
+// New HTML structure elements
+const explorerTree = document.getElementById('explorer-tree');
+const explorerSearch = document.getElementById('explorer-search');
+const availableTree = document.getElementById('available-tree');
+const availableSearch = document.getElementById('available-search');
+const refreshSavedNetworksBtn = document.getElementById('refresh-saved-networks');
+const scanNetworksBtn = document.getElementById('scan-networks-btn');
+const diagnosticsList = document.getElementById('diagnostics-list');
+const editorContent = document.getElementById('editor-content');
+// const editorContent = document.getElementById('editor-content');
+
+// Legacy variables removed - use explorerTree and explorerSearch directly
 
 // Global variables for search
 let allWifiData = [];
 let filteredData = [];
 
 // Available networks section variables
-const scanBtn = document.getElementById('scan-btn');
-const availableNetworksContainer = document.getElementById('available-networks-container');
-const scanStatus = document.getElementById('scan-status');
+const scanBtn = scanNetworksBtn;
+const availableNetworksContainer = availableTree;
+const scanStatus = null; // Will need to be handled differently
 const connectionModal = document.getElementById('connection-modal');
 const connectionForm = document.getElementById('connection-form');
 const modalClose = document.getElementById('modal-close');
@@ -131,6 +146,53 @@ const togglePassword = document.getElementById('toggle-password');
 const autoRefreshToggle = document.getElementById('auto-refresh-toggle');
 let autoRefreshInterval = null;
 let currentSection = 'saved';
+
+function determineSecurityFromDetails(detailsText = '') {
+  if (/WPA3/i.test(detailsText)) return 'WPA3';
+  if (/WPA2/i.test(detailsText)) return 'WPA2';
+  if (/WPA/i.test(detailsText)) return 'WPA';
+  if (/WEP/i.test(detailsText)) return 'WEP';
+  if (/Open|None/i.test(detailsText)) return 'Open';
+  return 'WPA';
+}
+
+function getNetworkSecurityLabel(network = {}) {
+  if (network.security) return network.security;
+  if (network.details?.authType) return network.details.authType;
+  return determineSecurityFromDetails(network.details?.fullDetails || '');
+}
+
+function escapeWifiQrField(value = '') {
+  return value.replace(/([\\;,:"])/g, '\\$1');
+}
+
+function buildWifiQrPayload(network = {}) {
+  const ssid = (network.name || network.ssid || '').trim();
+  if (!ssid) return null;
+  const password = (network.details?.password || '').trim();
+  const securityLabel = getNetworkSecurityLabel(network);
+  let qrSecurity = 'WPA';
+  if (!password) {
+    qrSecurity = 'nopass';
+  } else if (/WEP/i.test(securityLabel)) {
+    qrSecurity = 'WEP';
+  }
+
+  if (qrSecurity !== 'nopass' && !password) return null;
+
+  const escapedSsid = escapeWifiQrField(ssid);
+  const escapedPass = escapeWifiQrField(password);
+
+  if (qrSecurity === 'nopass') {
+    return `WIFI:T:nopass;S:${escapedSsid};H:false;;`;
+  }
+
+  return `WIFI:T:${qrSecurity};S:${escapedSsid};P:${escapedPass};H:false;;`;
+}
+
+function sanitizeFileName(input = '') {
+  return input.replace(/[<>:"/\\|?*]+/g, '_').trim() || 'termichemti-network';
+}
 
 // --- Helper function to create the HTML for the details section ---
 function createDetailsHtml(profile) {
@@ -160,130 +222,88 @@ function createDetailsHtml(profile) {
     `;
 }
 
-// --- Search functionality ---
-function filterNetworks(searchTerm) {
-  const term = searchTerm.toLowerCase().trim();
-
-  if (!term) {
-    filteredData = [...allWifiData];
-    updateSearchStats(allWifiData.length, allWifiData.length);
-    return;
-  }
-
-  filteredData = allWifiData.filter(profile =>
-    profile.name.toLowerCase().includes(term)
-  );
-
-  updateSearchStats(filteredData.length, allWifiData.length);
-}
-
-function updateSearchStats(showing, total) {
-  if (showing === total) {
-    searchStats.textContent = `Showing all ${total} networks`;
-  } else if (showing === 0) {
-    searchStats.textContent = `No networks found`;
-  } else {
-    searchStats.textContent = `Showing ${showing} of ${total} networks`;
-  }
-}
-
-function renderFilteredResults() {
-  if (filteredData.length === 0 && searchInput.value.trim()) {
-    // Show no results message
-    wifiListContainer.innerHTML = `
-            <div class="no-results">
-                <i class="fas fa-search"></i>
-                <h3>No networks found</h3>
-                <p>No Wi-Fi networks match "${searchInput.value.trim()}"</p>
-            </div>
-        `;
-    return;
-  }
-
-  // Render filtered results
-  wifiListContainer.innerHTML = filteredData.map(profile => `
-        <div class="wifi-item">
-            <div class="wifi-item-header">
-                <h2>${highlightSearchTerm(profile.name, searchInput.value)}</h2>
-                <i class="fas fa-chevron-right arrow-icon"></i>
-            </div>
-            <div class="wifi-details">
-                ${createDetailsHtml(profile)}
-            </div>
-        </div>
-    `).join('');
-}
-
-function highlightSearchTerm(text, searchTerm) {
-  if (!searchTerm.trim()) return text;
-
-  const regex = new RegExp(`(${searchTerm.trim()})`, 'gi');
-  return text.replace(regex, '<mark class="search-highlight">$1</mark>');
-}
+// Old search functions removed - now using renderExplorerTree() instead
 // --- Main function to load and render EVERYTHING ---
 async function loadAndRenderAllData() {
+  const explorerTreeEl = document.getElementById('explorer-tree');
+  
   try {
-    // Show loader if it exists
-    if (loader) loader.style.display = 'block';
-    if (headerSubtitle) headerSubtitle.textContent = 'Loading network data...';
-
-    const allProfilesData = await window.api.getAllWifiDetails();
+    console.log('Starting to load networks...');
+    logMessage('Loading saved networks...', 'info');
     
-    // Hide loader
-    if (loader) loader.style.display = 'none';
+    // Show loading state in explorer tree
+    if (explorerTreeEl) {
+      explorerTreeEl.innerHTML = `
+        <div class="tree-loading">
+          <div class="loader-small"></div>
+          <span>Loading networks...</span>
+        </div>
+      `;
+    } else {
+      console.error('explorer-tree element not found!');
+      logMessage('Error: Explorer tree element not found', 'error');
+      return;
+    }
 
-    if (allProfilesData.length === 0) {
-      if (headerSubtitle) headerSubtitle.textContent = 'No saved Wi-Fi networks found.';
-      if (wifiListContainer) {
-        wifiListContainer.innerHTML = `
-          <div class="no-results">
+    // Check if API is available
+    if (!window.api || !window.api.getAllWifiDetails) {
+      throw new Error('API not available. window.api.getAllWifiDetails is missing.');
+    }
+
+    // Add timeout wrapper to the API call
+    console.log('Calling getAllWifiDetails API...');
+    const apiCall = window.api.getAllWifiDetails();
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => {
+        console.error('API call timed out after 35 seconds!');
+        reject(new Error('Network loading timed out after 35 seconds. The system command might be hanging.'));
+      }, 35000);
+    });
+
+    let allProfilesData;
+    try {
+      allProfilesData = await Promise.race([apiCall, timeoutPromise]);
+      console.log('API call completed, received data:', allProfilesData?.length || 0, 'networks');
+    } catch (raceError) {
+      console.error('Error in Promise.race:', raceError);
+      throw raceError;
+    }
+
+    if (!allProfilesData || allProfilesData.length === 0) {
+      console.log('No networks found');
+      logMessage('No saved networks found', 'info');
+      if (explorerTreeEl) {
+        explorerTreeEl.innerHTML = `
+          <div class="tree-empty">
             <i class="fas fa-wifi-slash"></i>
-            <h3>No saved networks</h3>
-            <p>No Wi-Fi networks are currently saved on this device</p>
+            <p>No saved networks found</p>
           </div>
         `;
       }
       return;
     }
 
+    console.log(`Found ${allProfilesData.length} networks`);
+    logMessage(`Loaded ${allProfilesData.length} saved networks`, 'success');
+
     // Store data globally for search
     allWifiData = allProfilesData;
     filteredData = [...allWifiData];
 
-    if (headerSubtitle) {
-      headerSubtitle.textContent = `Found ${allProfilesData.length} saved networks.`;
-      headerSubtitle.style.color = '';
-    }
-
-    // Show search container with animation
-    if (searchContainer) {
-      searchContainer.style.display = 'block';
-      setTimeout(() => {
-        searchContainer.classList.add('show');
-      }, 100);
-    }
-
-    // Initial render
-    renderFilteredResults();
-    updateSearchStats(allWifiData.length, allWifiData.length);
+    // Render explorer tree with networks
+    renderExplorerTree();
 
   } catch (error) {
-    // Always hide loader on error
-    if (loader) loader.style.display = 'none';
     console.error('Error fetching all Wi-Fi details:', error);
+    logMessage(`Error loading networks: ${error.message || error}`, 'error');
     
-    if (headerSubtitle) {
-      headerSubtitle.textContent = `Error loading networks: ${error.message || error}`;
-      headerSubtitle.style.color = '#ff4d4d';
-    }
-    
-    if (wifiListContainer) {
-      wifiListContainer.innerHTML = `
-        <div class="error-message">
+    if (explorerTreeEl) {
+      explorerTreeEl.innerHTML = `
+        <div class="tree-empty">
           <i class="fas fa-exclamation-triangle"></i>
-          <h3>Failed to load networks</h3>
-          <p>${error.message || error}</p>
-          <button class="btn-primary retry-load-btn" style="margin-top: 10px;">
+          <p>Failed to load networks</p>
+          <p style="font-size: 11px; margin-top: 8px; color: #f48771;">${error.message || error}</p>
+          <button class="btn-primary retry-load-btn" style="margin-top: 12px; padding: 6px 12px; font-size: 12px;">
             <i class="fas fa-sync-alt"></i>
             Try Again
           </button>
@@ -291,7 +311,7 @@ async function loadAndRenderAllData() {
       `;
       
       // Add retry button listener
-      const retryBtn = wifiListContainer.querySelector('.retry-load-btn');
+      const retryBtn = explorerTreeEl.querySelector('.retry-load-btn');
       if (retryBtn) {
         retryBtn.addEventListener('click', loadAndRenderAllData);
       }
@@ -299,50 +319,86 @@ async function loadAndRenderAllData() {
   }
 }
 
-// --- Search event listeners ---
-searchInput.addEventListener('input', (e) => {
-  const searchTerm = e.target.value;
-
-  // Show/hide clear button
-  if (searchTerm.trim()) {
-    clearSearchBtn.classList.add('show');
-  } else {
-    clearSearchBtn.classList.remove('show');
+// Render networks in explorer tree view
+function renderExplorerTree(searchTerm = '') {
+  if (!explorerTree) return;
+  
+  const term = searchTerm.toLowerCase().trim();
+  let networksToShow = allWifiData;
+  
+  if (term) {
+    networksToShow = allWifiData.filter(profile => 
+      profile.name.toLowerCase().includes(term)
+    );
   }
+  
+  if (networksToShow.length === 0) {
+    explorerTree.innerHTML = `
+      <div class="tree-empty">
+        <i class="fas fa-search"></i>
+        <p>No networks match "${searchTerm}"</p>
+      </div>
+    `;
+    return;
+  }
+  
+  explorerTree.innerHTML = networksToShow.map(profile => `
+    <div class="tree-item" data-network-name="${profile.name}" title="${profile.name}">
+      <i class="fas fa-wifi"></i>
+      <span>${profile.name}</span>
+    </div>
+  `).join('');
+  
+  // Add click handlers to tree items
+  explorerTree.querySelectorAll('.tree-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const networkName = item.dataset.networkName;
+      const network = allWifiData.find(n => n.name === networkName);
+      if (network) {
+        openNetworkInEditor(network);
+      }
+    });
+  });
+}
 
-  // Filter and render results
-  filterNetworks(searchTerm);
-  renderFilteredResults();
-});
+// --- Search event listeners ---
+if (explorerSearch) {
+  explorerSearch.addEventListener('input', (e) => {
+    const searchTerm = e.target.value;
+    renderExplorerTree(searchTerm);
+  });
+}
 
-clearSearchBtn.addEventListener('click', () => {
-  searchInput.value = '';
-  clearSearchBtn.classList.remove('show');
-  filterNetworks('');
-  renderFilteredResults();
-  searchInput.focus();
-});
+if (availableSearch) {
+  availableSearch.addEventListener('input', (e) => {
+    const searchTerm = e.target.value.toLowerCase().trim();
+    const items = availableTree.querySelectorAll('.tree-item');
+    items.forEach(item => {
+      const text = item.textContent.toLowerCase();
+      item.style.display = text.includes(searchTerm) ? '' : 'none';
+    });
+  });
+}
+
+// Refresh button for saved networks
+if (refreshSavedNetworksBtn) {
+  refreshSavedNetworksBtn.addEventListener('click', () => {
+    loadAndRenderAllData();
+  });
+}
 
 // --- Keyboard shortcuts ---
 document.addEventListener('keydown', (e) => {
-  // Ctrl/Cmd + F to focus search
+  // Ctrl/Cmd + F to focus search in active sidebar
   if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
     e.preventDefault();
-    if (searchContainer.style.display !== 'none') {
-      searchInput.focus();
-      searchInput.select();
-    }
-  }
-
-  // Escape to clear search
-  if (e.key === 'Escape' && document.activeElement === searchInput) {
-    if (searchInput.value.trim()) {
-      searchInput.value = '';
-      clearSearchBtn.classList.remove('show');
-      filterNetworks('');
-      renderFilteredResults();
-    } else {
-      searchInput.blur();
+    const activeView = document.querySelector('.sidebar-view.active');
+    if (activeView) {
+      const searchInput = activeView.querySelector('input[type="text"]');
+      if (searchInput) {
+        searchInput.focus();
+        searchInput.select();
+      }
     }
   }
 
@@ -351,33 +407,6 @@ document.addEventListener('keydown', (e) => {
     e.preventDefault();
     loadAndRenderAllData();
   }
-});
-
-// --- Click handler for toggling visibility ---
-wifiListContainer.addEventListener('click', (event) => {
-  const header = event.target.closest('.wifi-item-header');
-  if (header) {
-    header.parentElement.classList.toggle('expanded');
-  }
-});
-
-// --- Click handler for the copy button ---
-wifiListContainer.addEventListener('click', (event) => {
-  const copyButton = event.target.closest('.copy-btn');
-  if (!copyButton) return;
-
-  const password = copyButton.dataset.password;
-  navigator.clipboard.writeText(password).then(() => {
-    const icon = copyButton.querySelector('i');
-    icon.classList.remove('fa-copy');
-    icon.classList.add('fa-check');
-    copyButton.title = 'Copied!';
-    setTimeout(() => {
-      icon.classList.remove('fa-check');
-      icon.classList.add('fa-copy');
-      copyButton.title = 'Copy password';
-    }, 2000);
-  });
 });
 
 // --- Show keyboard hint on first load ---
@@ -472,6 +501,8 @@ async function scanForNetworks() {
 
 // Render available networks
 function renderAvailableNetworks(networks) {
+  if (!availableNetworksContainer) return;
+
   if (networks.length === 0) {
     availableNetworksContainer.innerHTML = `
             <div class="no-results">
@@ -483,46 +514,77 @@ function renderAvailableNetworks(networks) {
     return;
   }
 
-  availableNetworksContainer.innerHTML = networks.map(network => `
-        <div class="available-network-item" data-ssid="${network.ssid}" data-security="${network.security}" data-signal="${network.signal}">
+  availableNetworksContainer.innerHTML = networks.map(network => {
+    const signalStrength = getSignalStrength(network.signal);
+    const signalClass = signalStrength.toLowerCase();
+    const securityLabel = network.security || 'Unknown';
+    const isOpenNetwork = securityLabel.toLowerCase().includes('open');
+    const channelLabel = network.channel && network.channel !== 'Unknown'
+      ? `Channel ${network.channel}`
+      : 'Channel N/A';
+    const frequencyLabel = network.frequency && network.frequency !== 'Unknown'
+      ? network.frequency
+      : 'Unknown band';
+    const signalValue = typeof network.signal === 'number' ? `${network.signal}%` : 'N/A';
+
+    return `
+        <div class="available-network-item ${signalClass}-signal ${isOpenNetwork ? 'open-network' : 'secure-network'}"
+             data-ssid="${network.ssid}"
+             data-security="${securityLabel}"
+             data-signal="${network.signal}"
+             data-channel="${network.channel || ''}"
+             data-frequency="${network.frequency || ''}">
             <div class="network-main-info">
-                <div class="network-icon-container">
-                    <i class="fas fa-wifi"></i>
+                <div class="signal-strength-badge">
+                    <span class="signal-value">${signalValue}</span>
+                    <span class="signal-label">${signalStrength}</span>
                 </div>
                 <div class="network-name-info">
-                    <h4>${network.ssid}</h4>
+                    <div class="network-name-row">
+                        <h4>${network.ssid}</h4>
+                        <span class="security-badge ${isOpenNetwork ? 'open' : 'secure'}">
+                            ${securityLabel}
+                        </span>
+                    </div>
                     <div class="network-metadata">
-                        <span class="signal-indicator">
+                        <span class="meta-item">
+                            <i class="fas fa-broadcast-tower"></i>
+                            ${channelLabel}
+                        </span>
+                        <span class="meta-item">
+                            <i class="fas fa-wave-square"></i>
+                            ${frequencyLabel}
+                        </span>
+                        <span class="meta-item signal-breakdown">
                             <div class="signal-bars">
                                 ${generateSignalBars(network.signal)}
                             </div>
-                            <span>${getSignalStrength(network.signal)}</span>
+                            <span>${signalStrength}</span>
                         </span>
-                        <span class="security-badge ${network.security.toLowerCase().includes('open') ? 'open' : 'secure'}">
-                            ${network.security}
-                        </span>
-                        <span>Channel: ${network.channel}</span>
                     </div>
                 </div>
             </div>
-            <button class="connect-btn">
-                <i class="fas fa-link"></i>
+            <button class="connect-btn" aria-label="Connect to ${network.ssid}">
+                <i class="fas fa-plug"></i>
                 Connect
             </button>
         </div>
-    `).join('');
+    `;
+  }).join('');
 }
 
 // Add event listener for available network clicks
-availableNetworksContainer.addEventListener('click', (event) => {
-  const networkItem = event.target.closest('.available-network-item');
-  if (networkItem) {
-    const ssid = networkItem.dataset.ssid;
-    const security = networkItem.dataset.security;
-    const signal = parseInt(networkItem.dataset.signal);
-    connectToNetwork(ssid, security, signal);
-  }
-});
+if (availableNetworksContainer) {
+  availableNetworksContainer.addEventListener('click', (event) => {
+    const networkItem = event.target.closest('.available-network-item');
+    if (networkItem) {
+      const ssid = networkItem.dataset.ssid;
+      const security = networkItem.dataset.security;
+      const signal = parseInt(networkItem.dataset.signal);
+      connectToNetwork(ssid, security, signal);
+    }
+  });
+}
 
 // Generate signal strength bars
 function generateSignalBars(signal) {
@@ -721,6 +783,12 @@ logPanelHeader.addEventListener('click', () => {
 });
 
 function logMessage(message, type = 'info') {
+  const logContentEl = document.getElementById('log-content');
+  if (!logContentEl) {
+    console.log(`[${type.toUpperCase()}] ${message}`);
+    return;
+  }
+  
   const now = new Date();
   const timeString = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
@@ -731,24 +799,148 @@ function logMessage(message, type = 'info') {
         <span class="log-message">${message}</span>
     `;
 
-  logContent.appendChild(entry);
-  logContent.scrollTop = logContent.scrollHeight; // Auto-scroll to bottom
+  logContentEl.appendChild(entry);
+  logContentEl.scrollTop = logContentEl.scrollHeight; // Auto-scroll to bottom
 }
 
 // --- Diagnostics Functionality ---
 
-const pingBtn = document.getElementById('btn-ping');
-const dnsBtn = document.getElementById('btn-dns');
-const ipconfigBtn = document.getElementById('btn-ipconfig');
-const speedtestBtn = document.getElementById('btn-speedtest');
+function showDiagnosticsPanel(selectedTool = 'ping') {
+  if (!editorContent) return;
 
-const pingOutput = document.getElementById('ping-output');
-const dnsOutput = document.getElementById('dns-output');
-const ipconfigOutput = document.getElementById('ipconfig-output');
-const speedtestOutput = document.getElementById('speedtest-output');
-const speedtestResults = document.getElementById('speedtest-results');
+  const diagnosticsPanel = editorContent.querySelector('.diagnostics-panel');
+  if (!diagnosticsPanel) {
+    renderDiagnosticsPanel(selectedTool);
+    return;
+  }
+
+  highlightDiagnosticItem(selectedTool);
+  const section = document.getElementById(`diagnostic-${selectedTool}`);
+  if (section) {
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function renderDiagnosticsPanel(selectedTool = 'ping') {
+  if (!editorContent) return;
+
+  editorContent.innerHTML = `
+    <div class="diagnostics-panel">
+      <div class="diagnostics-header">
+        <h2>Network Diagnostics</h2>
+        <p>Run connectivity checks and gather quick troubleshooting information.</p>
+      </div>
+
+      <section id="diagnostic-ping" class="diagnostic-card">
+        <div class="diagnostic-card-header">
+          <div>
+            <h3>Ping Test</h3>
+            <p>Check latency and reachability for a hostname or IP address.</p>
+          </div>
+          <button class="btn-primary diagnostic-action" id="btn-ping">
+            <i class="fas fa-play"></i>
+            Run Ping
+          </button>
+        </div>
+        <div class="diagnostic-inputs">
+          <label for="ping-host">Host / IP</label>
+          <input type="text" id="ping-host" placeholder="e.g. 8.8.8.8" value="8.8.8.8" />
+        </div>
+        <pre class="diagnostic-output" id="ping-output">Ready to run ping tests.</pre>
+      </section>
+
+      <section id="diagnostic-dns" class="diagnostic-card">
+        <div class="diagnostic-card-header">
+          <div>
+            <h3>DNS Lookup</h3>
+            <p>Resolve a hostname to verify DNS connectivity.</p>
+          </div>
+          <button class="btn-primary diagnostic-action" id="btn-dns">
+            <i class="fas fa-search"></i>
+            Lookup
+          </button>
+        </div>
+        <div class="diagnostic-inputs">
+          <label for="dns-host">Hostname</label>
+          <input type="text" id="dns-host" placeholder="e.g. example.com" value="example.com" />
+        </div>
+        <pre class="diagnostic-output" id="dns-output">Ready for DNS lookups.</pre>
+      </section>
+
+      <section id="diagnostic-ipconfig" class="diagnostic-card">
+        <div class="diagnostic-card-header">
+          <div>
+            <h3>IP Configuration</h3>
+            <p>Gather adapter addresses, gateways, and DNS servers.</p>
+          </div>
+          <button class="btn-primary diagnostic-action" id="btn-ipconfig">
+            <i class="fas fa-info-circle"></i>
+            Get Info
+          </button>
+        </div>
+        <pre class="diagnostic-output" id="ipconfig-output">IP configuration output will appear here.</pre>
+      </section>
+
+      <section id="diagnostic-speedtest" class="diagnostic-card">
+        <div class="diagnostic-card-header">
+          <div>
+            <h3>Speed Test</h3>
+            <p>Measure your connection speed and latency.</p>
+          </div>
+          <button class="btn-primary diagnostic-action" id="btn-speedtest">
+            <i class="fas fa-tachometer-alt"></i>
+            Run Test
+          </button>
+        </div>
+        <pre class="diagnostic-output" id="speedtest-output">Speed test results will be shown here.</pre>
+        <div class="speedtest-results hidden" id="speedtest-results">
+          <div class="speed-result">
+            <span>Download</span>
+            <strong id="speed-download">0 Mbps</strong>
+          </div>
+          <div class="speed-result">
+            <span>Latency</span>
+            <strong id="speed-latency">0 ms</strong>
+          </div>
+        </div>
+      </section>
+    </div>
+  `;
+
+  highlightDiagnosticItem(selectedTool);
+  initializeDiagnosticsSection();
+
+  const section = document.getElementById(`diagnostic-${selectedTool}`);
+  if (section) {
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function highlightDiagnosticItem(tool) {
+  if (!diagnosticsList) return;
+  diagnosticsList.querySelectorAll('.diagnostic-item').forEach(item => {
+    if (item.dataset.diagnostic === tool) {
+      item.classList.add('active');
+    } else {
+      item.classList.remove('active');
+    }
+  });
+}
+
+if (diagnosticsList) {
+  diagnosticsList.addEventListener('click', (event) => {
+    const item = event.target.closest('.diagnostic-item');
+    if (!item) return;
+    showDiagnosticsPanel(item.dataset.diagnostic);
+  });
+}
 
 function initializeDiagnosticsSection() {
+  const pingBtn = document.getElementById('btn-ping');
+  const dnsBtn = document.getElementById('btn-dns');
+  const ipconfigBtn = document.getElementById('btn-ipconfig');
+  const speedtestBtn = document.getElementById('btn-speedtest');
+
   if (pingBtn) pingBtn.addEventListener('click', runPing);
   if (dnsBtn) dnsBtn.addEventListener('click', runDnsLookup);
   if (ipconfigBtn) ipconfigBtn.addEventListener('click', getIpConfig);
@@ -756,7 +948,12 @@ function initializeDiagnosticsSection() {
 }
 
 async function runPing() {
-  const host = document.getElementById('ping-host').value;
+  const hostInput = document.getElementById('ping-host');
+  const pingBtn = document.getElementById('btn-ping');
+  const pingOutput = document.getElementById('ping-output');
+  if (!hostInput || !pingBtn || !pingOutput) return;
+
+  const host = hostInput.value.trim();
   if (!host) return;
 
   pingOutput.textContent = `Pinging ${host}...\n`;
@@ -776,7 +973,12 @@ async function runPing() {
 }
 
 async function runDnsLookup() {
-  const host = document.getElementById('dns-host').value;
+  const hostInput = document.getElementById('dns-host');
+  const dnsBtn = document.getElementById('btn-dns');
+  const dnsOutput = document.getElementById('dns-output');
+  if (!hostInput || !dnsBtn || !dnsOutput) return;
+
+  const host = hostInput.value.trim();
   if (!host) return;
 
   dnsOutput.textContent = `Looking up DNS for ${host}...\n`;
@@ -796,6 +998,10 @@ async function runDnsLookup() {
 }
 
 async function getIpConfig() {
+  const ipconfigBtn = document.getElementById('btn-ipconfig');
+  const ipconfigOutput = document.getElementById('ipconfig-output');
+  if (!ipconfigBtn || !ipconfigOutput) return;
+
   ipconfigOutput.textContent = 'Fetching IP configuration...\n';
   ipconfigBtn.disabled = true;
   logMessage('Fetching IP configuration', 'info');
@@ -813,6 +1019,13 @@ async function getIpConfig() {
 }
 
 async function runSpeedTest() {
+  const speedtestBtn = document.getElementById('btn-speedtest');
+  const speedtestOutput = document.getElementById('speedtest-output');
+  const speedtestResults = document.getElementById('speedtest-results');
+  const downloadEl = document.getElementById('speed-download');
+  const latencyEl = document.getElementById('speed-latency');
+  if (!speedtestBtn || !speedtestOutput || !speedtestResults || !downloadEl || !latencyEl) return;
+
   speedtestOutput.textContent = 'Running speed test (this may take a moment)...\n';
   speedtestBtn.disabled = true;
   speedtestResults.classList.add('hidden');
@@ -822,8 +1035,8 @@ async function runSpeedTest() {
     const result = await window.api.runSpeedTest();
     if (result.success) {
       speedtestOutput.textContent = 'Speed test completed successfully.';
-      document.getElementById('speed-download').textContent = `${result.result.downloadSpeed} Mbps`;
-      document.getElementById('speed-latency').textContent = `${result.result.latency} ms`;
+      downloadEl.textContent = `${result.result.downloadSpeed} Mbps`;
+      latencyEl.textContent = `${result.result.latency} ms`;
       speedtestResults.classList.remove('hidden');
       logMessage(`Speed test result: ${result.result.downloadSpeed} Mbps, ${result.result.latency}ms`, 'success');
     } else {
@@ -834,6 +1047,84 @@ async function runSpeedTest() {
     speedtestOutput.textContent = `Error: ${error.message || error}`;
     logMessage(`Speed test error: ${error}`, 'error');
   } finally {
+    speedtestBtn.disabled = false;
+  }
+}
+
+function initializeQrShare(network) {
+  if (!editorContent) return;
+  const qrCanvas = editorContent.querySelector('#wifi-qr-canvas');
+  const statusEl = editorContent.querySelector('#qr-share-status');
+  const refreshBtn = editorContent.querySelector('#refresh-qr-btn');
+  const downloadBtn = editorContent.querySelector('#download-qr-btn');
+
+  if (!qrCanvas) return;
+
+  const disableShare = (message) => {
+    if (statusEl) statusEl.textContent = message;
+    if (refreshBtn) refreshBtn.disabled = true;
+    if (downloadBtn) downloadBtn.disabled = true;
+  };
+
+  let qrInstance = null;
+
+  const renderQr = () => {
+    const payload = buildWifiQrPayload(network);
+    if (!payload) {
+      disableShare('Missing password or SSID details to encode this network.');
+      return null;
+    }
+
+    if (refreshBtn) refreshBtn.disabled = false;
+    if (downloadBtn) downloadBtn.disabled = false;
+
+    if (typeof QRious === 'undefined') {
+      disableShare('QR engine unavailable. Please ensure the QR library is reachable.');
+      return null;
+    }
+
+    if (!qrInstance) {
+      qrInstance = new QRious({
+        element: qrCanvas,
+        value: payload,
+        size: 220,
+        background: '#ffffff',
+        foreground: '#0f172a',
+        level: 'H'
+      });
+    } else {
+      qrInstance.value = payload;
+    }
+
+    qrCanvas.dataset.qrPayload = payload;
+    if (statusEl) statusEl.textContent = 'QR ready to scan.';
+    return qrInstance;
+  };
+
+  qrInstance = renderQr();
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      const instance = renderQr();
+      if (instance && statusEl) {
+        statusEl.textContent = 'QR refreshed just now.';
+      }
+      logMessage(`QR code refreshed for ${network.name}`, 'info');
+    });
+  }
+
+  if (downloadBtn) {
+    downloadBtn.addEventListener('click', () => {
+      const instance = qrInstance || renderQr();
+      if (!instance) return;
+      const link = document.createElement('a');
+      link.href = instance.toDataURL('image/png');
+      link.download = `${sanitizeFileName(network.name || 'network')}-wifi-qr.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      logMessage(`QR code downloaded for ${network.name}`, 'success');
+    });
   }
 }
 
@@ -862,15 +1153,16 @@ async function updateConnectionIndicator() {
     const status = await Promise.race([statusPromise, timeoutPromise]);
     currentConnection = status;
 
-    if (status && status.connected && status.ssid) {
+    if (status && status.connected) {
+      const networkName = status.ssid || 'Connected';
       if (connectionIndicator) {
         connectionIndicator.classList.remove('disconnected');
         connectionIndicator.classList.add('connected');
       }
       if (connectionStatusText) {
-        connectionStatusText.textContent = status.ssid;
+        connectionStatusText.textContent = networkName;
       }
-      logMessage(`Connected to: ${status.ssid}`, 'success');
+      logMessage(`Connected to: ${networkName}`, 'success');
     } else {
       if (connectionIndicator) {
         connectionIndicator.classList.remove('connected');
@@ -897,7 +1189,7 @@ async function updateConnectionIndicator() {
 // Show connection details modal
 function showConnectionDetails() {
   if (currentConnection && currentConnection.connected) {
-    currentNetworkName.textContent = currentConnection.ssid;
+    currentNetworkName.textContent = currentConnection.ssid || 'Connected';
     currentNetworkStatus.textContent = 'Connected';
     disconnectBtn.style.display = 'flex';
   } else {
@@ -965,11 +1257,22 @@ async function handleDisconnect() {
   }
 }
 
-// Event listeners for connection indicator
-connectionIndicator.addEventListener('click', showConnectionDetails);
-connectionModalClose.addEventListener('click', closeConnectionDetailsModal);
-closeConnectionDetails.addEventListener('click', closeConnectionDetailsModal);
-disconnectBtn.addEventListener('click', handleDisconnect);
+// Event listeners for connection indicator (if elements exist)
+if (connectionIndicator) {
+  connectionIndicator.addEventListener('click', showConnectionDetails);
+}
+// const connectionModalClose = document.getElementById('connection-modal-close');
+// const closeConnectionDetails = document.getElementById('close-connection-details');
+// const disconnectBtn = document.getElementById('disconnect-btn');
+if (connectionModalClose) {
+  connectionModalClose.addEventListener('click', closeConnectionDetailsModal);
+}
+if (closeConnectionDetails) {
+  closeConnectionDetails.addEventListener('click', closeConnectionDetailsModal);
+}
+if (disconnectBtn) {
+  disconnectBtn.addEventListener('click', handleDisconnect);
+}
 
 // Close modal on outside click
 connectionDetailsModal.addEventListener('click', (e) => {
@@ -997,12 +1300,154 @@ function stopConnectionRefresh() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', async () => {
-  initializeDiagnosticsSection();
-  await loadAndRenderAllData();
+// Function to open network details in editor
+function openNetworkInEditor(network) {
+  // Create or update tab
+  const tabId = `tab-${network.name}`;
+  let tab = document.querySelector(`.editor-tab[data-tab-id="${tabId}"]`);
+  
+  if (!tab) {
+    // Create new tab
+    const editorTabs = document.querySelector('.editor-tabs');
+    tab = document.createElement('div');
+    tab.className = 'editor-tab active';
+    tab.dataset.tabId = tabId;
+    tab.innerHTML = `
+      <i class="fas fa-wifi"></i>
+      <span>${network.name}</span>
+      <i class="fas fa-times editor-tab-close"></i>
+    `;
+    
+    // Remove active from other tabs
+    editorTabs.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('active'));
+    
+    editorTabs.appendChild(tab);
+    
+    // Close tab handler
+    const closeBtn = tab.querySelector('.editor-tab-close');
+    closeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      tab.remove();
+      // Show empty state if no tabs
+      if (editorTabs.querySelectorAll('.editor-tab').length === 0) {
+        if (editorContent) {
+          editorContent.innerHTML = `
+          <div class="editor-empty-state">
+            <i class="fas fa-folder-open"></i>
+            <h2>No Network Selected</h2>
+            <p>Select a network from the explorer to view details</p>
+          </div>
+        `;
+        }
+      }
+    });
+  }
+  
+  // Activate tab
+  document.querySelectorAll('.editor-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  
+  // Render network details
+  renderNetworkDetails(network);
+}
 
-  // Start connection status monitoring
+// Render network details in editor
+function renderNetworkDetails(network) {
+  if (!editorContent) return;
+  
+  const details = network.details || {};
+  const password = details.password || 'Not available';
+  const securityLabel = getNetworkSecurityLabel(network);
+  
+  editorContent.innerHTML = `
+    <div class="network-details-view">
+      <div class="network-header">
+        <div class="network-header-icon">
+          <i class="fas fa-wifi"></i>
+        </div>
+        <div class="network-header-info">
+          <h2>${network.name}</h2>
+          <p>Saved Wi-Fi Network</p>
+        </div>
+      </div>
+      <div class="network-content">
+        <div class="detail-section">
+          <h3>Password</h3>
+          <div class="detail-row password-row">
+            <div class="detail-value" style="font-family: 'Fira Code', monospace; word-break: break-all;">${password}</div>
+            <button class="copy-btn" data-password="${password}">
+              <i class="fas fa-copy"></i> Copy
+            </button>
+          </div>
+        </div>
+        <div class="detail-section qr-share-section">
+          <div class="qr-share-header">
+            <div>
+              <h3>Share via QR Code</h3>
+              <p>Scan to connect instantly using any modern device camera.</p>
+            </div>
+            <button class="btn-secondary" id="download-qr-btn">
+              <i class="fas fa-download"></i>
+              Download PNG
+            </button>
+          </div>
+          <div class="qr-share-body">
+            <canvas id="wifi-qr-canvas" width="220" height="220" aria-label="Wi-Fi QR code preview"></canvas>
+            <div class="qr-share-info">
+              <p><strong>SSID:</strong> ${network.name}</p>
+              <p><strong>Security:</strong> ${securityLabel}</p>
+              <button class="btn-primary" id="refresh-qr-btn">
+                <i class="fas fa-sync-alt"></i>
+                Refresh QR
+              </button>
+              <p class="qr-share-note" id="qr-share-status">Preparing secure QR payload...</p>
+            </div>
+          </div>
+        </div>
+        <div class="detail-section">
+          <h3>Full Profile Details</h3>
+          <div class="full-details">${details.fullDetails || 'No additional details available'}</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  // Add copy button handler
+  const copyBtn = editorContent.querySelector('.copy-btn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      const password = copyBtn.dataset.password;
+      navigator.clipboard.writeText(password).then(() => {
+        const icon = copyBtn.querySelector('i');
+        icon.className = 'fas fa-check';
+        setTimeout(() => {
+          icon.className = 'fas fa-copy';
+        }, 2000);
+      });
+    });
+  }
+
+  initializeQrShare(network);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('DOM Content Loaded - initializing app...');
+  
+  // Make sure elements exist
+  if (!explorerTree) {
+    console.error('ERROR: explorer-tree element not found in DOM!');
+    logMessage('Critical error: Explorer tree element not found', 'error');
+    return;
+  }
+
+  initializeAvailableNetworksSection();
+  
+  // Initialize connection status monitoring first
   startConnectionRefresh();
+  
+  console.log('Starting to load networks...');
+  // Load saved networks
+  await loadAndRenderAllData();
 
   logMessage('Application started', 'info');
   logMessage('Initializing components...', 'info');

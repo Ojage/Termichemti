@@ -25,10 +25,8 @@ function createWindow() {
     // Load the app
     mainWindow.loadFile('index.html');
 
-    // Open DevTools in development
-    if (process.env.NODE_ENV === 'development') {
-        mainWindow.webContents.openDevTools();
-    }
+    // Open DevTools to see errors (you can remove this later)
+    // mainWindow.webContents.openDevTools();
 
     // Emitted when the window is closed
     mainWindow.on('closed', function () {
@@ -65,14 +63,19 @@ function parseWifiList(stdout, platform) {
 
 function parseWifiDetails(stdout, platform) {
     let password = null;
+    let authType = null;
     if (platform === 'win32') {
         const match = stdout.match(/Key Content\s+:\s(.*)/);
         if (match) password = match[1].trim();
+        const authMatch = stdout.match(/Authentication\s+:\s(.*)/);
+        if (authMatch) authType = authMatch[1].trim();
     } else { // linux
         const match = stdout.match(/802-11-wireless-security.psk:\s*(.*)/);
         if (match) password = match[1].trim();
+        const authMatch = stdout.match(/802-11-wireless-security.key-mgmt:\s*(.*)/);
+        if (authMatch) authType = authMatch[1].trim();
     }
-    return { password: password, fullDetails: stdout.trim() };
+    return { password: password, fullDetails: stdout.trim(), authType };
 }
 
 // --- Parse available networks ---
@@ -223,6 +226,64 @@ function parseWindowsAvailableNetworks(stdout) {
     }
 
     return uniqueNetworks.sort((a, b) => b.signal - a.signal);
+}
+
+function parseWindowsConnectionStatus(stdout) {
+    const lines = stdout.split(/\r?\n/);
+    let state = null;
+    let ssid = null;
+    let profile = null;
+
+    const normalizeValue = (value) => {
+        if (!value) return null;
+        const cleaned = value.trim();
+        if (!cleaned || cleaned === 'N/A') return null;
+        if (cleaned.toLowerCase().includes('not available')) return null;
+        return cleaned;
+    };
+
+    const evaluateBlock = () => {
+        if (state && state.toLowerCase().includes('connected')) {
+            return normalizeValue(ssid) || normalizeValue(profile);
+        }
+        return null;
+    };
+
+    const resetBlock = () => {
+        state = null;
+        ssid = null;
+        profile = null;
+    };
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+
+        if (!line) {
+            const result = evaluateBlock();
+            if (result) return result;
+            resetBlock();
+            continue;
+        }
+
+        const stateMatch = line.match(/^State\s*:\s*(.+)$/i);
+        if (stateMatch) {
+            state = stateMatch[1];
+            continue;
+        }
+
+        const ssidMatch = line.match(/^SSID\s*:\s*(.+)$/i);
+        if (ssidMatch) {
+            ssid = ssidMatch[1];
+            continue;
+        }
+
+        const profileMatch = line.match(/^Profile\s*:\s*(.+)$/i);
+        if (profileMatch) {
+            profile = profileMatch[1];
+        }
+    }
+
+    return evaluateBlock();
 }
 
 // --- Parse Linux available networks ---
@@ -529,17 +590,7 @@ ipcMain.handle('get-connection-status', async () => {
                 let currentNetwork = null;
 
                 if (platform === 'win32') {
-                    const lines = stdout.split('\n');
-                    for (const line of lines) {
-                        const match = line.match(/^\s*SSID\s*:\s*(.+)$/);
-                        if (match) {
-                            currentNetwork = match[1].trim();
-                            // Skip empty or placeholder SSIDs
-                            if (currentNetwork && currentNetwork !== 'N/A') {
-                                break;
-                            }
-                        }
-                    }
+                    currentNetwork = parseWindowsConnectionStatus(stdout);
                 } else { // linux
                     // Parse nmcli tab-separated output: NAME:TYPE
                     const lines = stdout.split('\n');

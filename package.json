@@ -16,8 +16,8 @@
   "license": "ISC",
   "productName": "Termichemti",
   "devDependencies": {
-    "electron-builder": "^36.5.0",
-    "electron": "^36.5.0"
+    "electron-builder": "^26.3.1",
+    "electron": "^36.9.5"
   },
   "build": {
     "appId": "com.salathielojage.termichemti",

@@ -361,6 +361,215 @@ body {
   opacity: 0.5;
 }
 
+/* === Available Networks === */
+.available-network-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--primary-surface-color);
+  margin-bottom: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.available-network-item:hover {
+  border-color: var(--accent-color);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  transform: translateY(-1px);
+}
+
+.available-network-item.secure-network {
+  border-left: 3px solid var(--accent-color);
+}
+
+.available-network-item.open-network {
+  border-left: 3px solid #f5a524;
+}
+
+.network-main-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+}
+
+.signal-strength-badge {
+  width: 90px;
+  padding: 12px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background-color: var(--secondary-surface-color);
+  text-align: center;
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--secondary-text-color);
+}
+
+.available-network-item.excellent-signal .signal-strength-badge {
+  border-color: #2ecc71;
+  color: #2ecc71;
+}
+
+.available-network-item.good-signal .signal-strength-badge {
+  border-color: #27ae60;
+  color: #27ae60;
+}
+
+.available-network-item.fair-signal .signal-strength-badge {
+  border-color: #f1c40f;
+  color: #f1c40f;
+}
+
+.available-network-item.weak-signal .signal-strength-badge {
+  border-color: #e74c3c;
+  color: #e74c3c;
+}
+
+.signal-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--primary-text-color);
+}
+
+.signal-label {
+  font-size: 11px;
+}
+
+.network-name-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.network-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.network-name-row h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--primary-text-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.security-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.security-badge.secure {
+  background-color: rgba(46, 204, 113, 0.12);
+  color: #2ecc71;
+}
+
+.security-badge.open {
+  background-color: rgba(245, 165, 36, 0.15);
+  color: #f5a524;
+}
+
+.network-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--secondary-text-color);
+}
+
+.meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background-color: var(--secondary-surface-color);
+  border: 1px solid var(--border-color);
+}
+
+.meta-item i {
+  font-size: 11px;
+  color: var(--secondary-text-color);
+}
+
+.signal-breakdown {
+  gap: 4px;
+}
+
+.signal-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 16px;
+}
+
+.signal-bar {
+  width: 4px;
+  height: 6px;
+  border-radius: 2px;
+  background-color: var(--border-color);
+  transition: height 0.2s ease, background-color 0.2s ease;
+}
+
+.signal-bar:nth-child(2) {
+  height: 9px;
+}
+
+.signal-bar:nth-child(3) {
+  height: 12px;
+}
+
+.signal-bar:nth-child(4) {
+  height: 15px;
+}
+
+.signal-bar.active {
+  background-color: var(--accent-color);
+}
+
+.available-network-item.weak-signal .signal-bar.active {
+  background-color: #e74c3c;
+}
+
+.connect-btn {
+  border: none;
+  padding: 10px 18px;
+  border-radius: 6px;
+  background: var(--accent-color);
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.connect-btn:hover {
+  background-color: #0d6efd;
+  transform: translateY(-1px);
+}
+
+.connect-btn:active {
+  transform: translateY(0);
+}
+
 .loader-small {
   width: 16px;
   height: 16px;
@@ -390,6 +599,128 @@ body {
 
 .diagnostic-item:hover {
   background-color: var(--hover-color);
+}
+
+.diagnostic-item.active {
+  background-color: var(--selection-bg);
+  color: var(--primary-text-color);
+}
+
+.diagnostic-item.active i {
+  color: var(--primary-text-color);
+}
+
+.diagnostics-panel {
+  max-width: 960px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.diagnostics-header h2 {
+  margin: 0 0 4px;
+  color: var(--primary-text-color);
+}
+
+.diagnostics-header p {
+  margin: 0;
+  color: var(--secondary-text-color);
+}
+
+.diagnostic-card {
+  background-color: var(--primary-surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.diagnostic-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.diagnostic-card-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--primary-text-color);
+}
+
+.diagnostic-card-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--secondary-text-color);
+}
+
+.diagnostic-action {
+  height: 36px;
+}
+
+.diagnostic-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.diagnostic-inputs label {
+  font-size: 12px;
+  color: var(--secondary-text-color);
+}
+
+.diagnostic-inputs input {
+  background-color: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px 10px;
+  color: var(--primary-text-color);
+  font-size: 13px;
+}
+
+.diagnostic-output {
+  width: 100%;
+  min-height: 120px;
+  max-height: 280px;
+  background-color: var(--editor-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 12px;
+  font-family: 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--primary-text-color);
+  overflow-y: auto;
+  white-space: pre-wrap;
+}
+
+.speedtest-results {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.speedtest-results .speed-result {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--secondary-surface-color);
+  text-align: center;
+}
+
+.speed-result span {
+  display: block;
+  font-size: 12px;
+  color: var(--secondary-text-color);
+  margin-bottom: 4px;
+}
+
+.speed-result strong {
+  font-size: 20px;
+  color: var(--primary-text-color);
 }
 
 .diagnostic-item i {
@@ -519,6 +850,65 @@ body {
   border: 1px solid var(--border-color);
   border-radius: 4px;
   margin-bottom: 20px;
+}
+
+.qr-share-section {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 16px;
+  background-color: var(--primary-surface-color);
+}
+
+.qr-share-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.qr-share-header h3 {
+  margin: 0 0 4px;
+}
+
+.qr-share-header p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--secondary-text-color);
+}
+
+.qr-share-body {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+#wifi-qr-canvas {
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 8px;
+  background-color: #ffffff;
+  width: 220px;
+  height: 220px;
+}
+
+.qr-share-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--secondary-text-color);
+}
+
+.qr-share-info strong {
+  color: var(--primary-text-color);
+}
+
+.qr-share-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--secondary-text-color);
 }
 
 .network-header-icon {
