@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; script-src 'self'">
+    <title>Termichemti - Wi-Fi Manager</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700&family=Josefin+Sans:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body data-theme="dark">
+    <!-- Top Title Bar -->
+    <div class="title-bar">
+        <div class="title-bar-left">
+            <h1 class="app-title">Termichemti</h1>
+        </div>
+        <div class="title-bar-right">
+            <div class="connection-indicator" id="connection-indicator">
+                <i class="fas fa-wifi"></i>
+                <span id="connection-status-text">Checking...</span>
+            </div>
+            <button class="settings-btn" id="settings-btn" title="Settings">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Application Layout -->
+    <div class="app-container">
+        <!-- Activity Bar (Left Icon Bar) -->
+        <div class="activity-bar">
+            <button class="activity-bar-item active" data-view="explorer" title="Saved Networks Explorer">
+                <i class="fas fa-folder-open"></i>
+            </button>
+            <button class="activity-bar-item" data-view="available" title="Available Networks">
+                <i class="fas fa-wifi"></i>
+            </button>
+            <button class="activity-bar-item" data-view="diagnostics" title="Diagnostics">
+                <i class="fas fa-puzzle-piece"></i>
+            </button>
+            <div class="activity-bar-divider"></div>
+            <button class="activity-bar-item" id="settings-activity-btn" title="Settings">
+                <i class="fas fa-cog"></i>
+            </button>
+        </div>
+
+        <!-- Sidebar (Explorer Panels) -->
+        <div class="sidebar">
+            <!-- Saved Networks Explorer -->
+            <div class="sidebar-view active" id="explorer-view">
+                <div class="sidebar-header">
+                    <span class="sidebar-title">SAVED NETWORKS</span>
+                    <div class="sidebar-actions">
+                        <button class="sidebar-action-btn" id="refresh-saved-networks" title="Refresh">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="sidebar-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="explorer-search" placeholder="Search networks..." autocomplete="off">
+                </div>
+                <div class="explorer-tree" id="explorer-tree">
+                    <div class="tree-loading">
+                        <div class="loader-small"></div>
+                        <span>Loading networks...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Available Networks Explorer -->
+            <div class="sidebar-view" id="available-view">
+                <div class="sidebar-header">
+                    <span class="sidebar-title">AVAILABLE NETWORKS</span>
+                    <div class="sidebar-actions">
+                        <button class="sidebar-action-btn" id="scan-networks-btn" title="Scan Networks">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="sidebar-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="available-search" placeholder="Search networks..." autocomplete="off">
+                </div>
+                <div class="explorer-tree" id="available-tree">
+                    <div class="tree-empty">
+                        <i class="fas fa-wifi-slash"></i>
+                        <p>Click scan to discover networks</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Diagnostics View -->
+            <div class="sidebar-view" id="diagnostics-view">
+                <div class="sidebar-header">
+                    <span class="sidebar-title">DIAGNOSTICS</span>
+                </div>
+                <div class="sidebar-search">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="diagnostics-search" placeholder="Search diagnostics..." autocomplete="off">
+                </div>
+                <div class="diagnostics-list" id="diagnostics-list">
+                    <div class="diagnostic-item" data-diagnostic="ping">
+                        <i class="fas fa-network-wired"></i>
+                        <span>Ping Test</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="dns">
+                        <i class="fas fa-globe"></i>
+                        <span>DNS Lookup</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="ipconfig">
+                        <i class="fas fa-laptop-code"></i>
+                        <span>IP Configuration</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="speedtest">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Speed Test</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Editor Area -->
+        <div class="editor-container">
+            <div class="editor-tabs">
+                <!-- Tabs will be dynamically added here -->
+            </div>
+            <div class="editor-content" id="editor-content">
+                <div class="editor-empty-state">
+                    <i class="fas fa-folder-open"></i>
+                    <h2>No Network Selected</h2>
+                    <p>Select a network from the explorer to view details</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settings-panel">
+        <div class="settings-header">
+            <h2>Settings</h2>
+            <button class="close-settings" id="close-settings">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="settings-body">
+            <div class="setting-group">
+                <h3>Appearance</h3>
+                <div class="setting-item">
+                    <label for="theme-select">Theme</label>
+                    <select id="theme-select" class="theme-select">
+                        <option value="auto">Auto (Follow System)</option>
+                        <option value="light">Light</option>
+                        <option value="dark">Dark</option>
+                    </select>
+                </div>
+            </div>
+            <div class="setting-group">
+                <h3>About</h3>
+                <p class="about-text">Termichemti v1.0.0</p>
+                <p class="about-text">Developed by Salathiel Ojage</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Modal -->
+    <div class="modal-overlay" id="connection-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Connect to Network</h3>
+                <button class="modal-close" id="modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="network-info">
+                    <div class="network-icon">
+                        <i class="fas fa-wifi"></i>
+                    </div>
+                    <div class="network-details">
+                        <h4 id="modal-network-name">Network Name</h4>
+                        <div class="network-meta">
+                            <span class="signal-strength" id="modal-signal">
+                                <i class="fas fa-signal"></i>
+                                <span>Strong</span>
+                            </span>
+                            <span class="security-type" id="modal-security">WPA2</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <form id="connection-form">
+                    <div class="form-group">
+                        <label for="network-password">Password</label>
+                        <div class="password-input-group">
+                            <input type="password" id="network-password" placeholder="Enter network password" required>
+                            <button type="button" class="toggle-password" id="toggle-password">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="save-network" checked>
+                            <span class="checkmark"></span>
+                            Save this network
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="auto-connect">
+                            <span class="checkmark"></span>
+                            Connect automatically
+                        </label>
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button type="button" class="btn-secondary" id="cancel-connection">Cancel</button>
+                        <button type="submit" class="btn-primary" id="connect-btn">
+                            <i class="fas fa-wifi"></i>
+                            Connect
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="connection-progress hidden" id="connection-progress">
+                    <div class="progress-spinner"></div>
+                    <p>Connecting to network...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Details Modal -->
+    <div class="modal-overlay" id="connection-details-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Current Connection</h3>
+                <button class="modal-close" id="connection-modal-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="network-info">
+                    <div class="network-icon">
+                        <i class="fas fa-wifi"></i>
+                    </div>
+                    <div class="network-details">
+                        <h4 id="current-network-name">Not Connected</h4>
+                        <p id="current-network-status" class="network-status-text">No active connection</p>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="close-connection-details">Close</button>
+                    <button type="button" class="btn-primary" id="disconnect-btn" style="display: none;">
+                        <i class="fas fa-unlink"></i>
+                        Disconnect
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logging Panel -->
+    <div class="log-panel-container">
+        <div class="log-panel-header" id="log-panel-header">
+            <span><i class="fas fa-terminal"></i> Application Logs</span>
+            <i class="fas fa-chevron-up" id="log-toggle-icon"></i>
+        </div>
+        <div class="log-panel-body" id="log-content">
+            <!-- Logs will be injected here -->
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>

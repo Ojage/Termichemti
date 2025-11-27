@@ -1,0 +1,47 @@
+{
+  "name": "termichemti",
+  "version": "1.0.0",
+  "description": "A utility to view and manage saved Wi-Fi network passwords.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "keywords": [
+    "wifi",
+    "password",
+    "network"
+  ],
+  "author": "Salathiel Ojage",
+  "license": "ISC",
+  "productName": "Termichemti",
+  "devDependencies": {
+    "electron-builder": "^36.5.0",
+    "electron": "^36.5.0"
+  },
+  "build": {
+    "appId": "com.salathielojage.termichemti",
+    "productName": "Termichemti",
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "style.css",
+      "renderer.js",
+      "node_modules/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/termichemti.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "build/termichemti.png"
+    }
+  }
+}

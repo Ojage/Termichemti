@@ -1,0 +1,104 @@
+# === Dependencies ===
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# === Build Output ===
+dist/
+build/
+out/
+*.exe
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.AppImage
+*.snap
+*.zip
+*.blockmap
+*.yml
+*.yaml
+
+# === Electron Builder ===
+electron-builder-output/
+*.unpacked/
+
+# === Environment Variables ===
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# === IDE & Editor ===
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+
+# === OS Files ===
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# === Logs ===
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# === Coverage ===
+coverage/
+*.lcov
+.nyc_output/
+
+# === Testing ===
+.jest/
+__tests__/coverage/
+
+# === Temporary Files ===
+*.tmp
+*.temp
+*.cache
+.cache/
+.temp/
+tmp/
+temp/
+
+# === Backup Files ===
+*.backup
+*.old
+*.bak
+*.orig
+*~
+
+# === Package Manager Lock Files ===
+# Uncomment if you want to ignore lock files
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# === Electron Specific ===
+*.asar
+.electron-gyp/
+app/node_modules/
+
+# === Optional: Keep package-lock.json or yarn.lock ===
+# Uncomment the ones you don't want to track:
+# package-lock.json
+# yarn.lock
