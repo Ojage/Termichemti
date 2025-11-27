@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; script-src 'self' https://cdnjs.cloudflare.com">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; font-src https://cdnjs.cloudflare.com https://fonts.gstatic.com; script-src 'self'; img-src 'self' data: https://quickchart.io; connect-src 'self' https://quickchart.io">
     <title>Termichemti - Wi-Fi Manager</title>
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -275,7 +275,6 @@
         </div>
     </div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js" integrity="sha512-pkEc/WSavwgJeayQMZT6ZX0hgqP/d9vywgq6Z9erjRzCQXDpUe1koRaSPoaqe7iT730cdpShUMHbOWuZH/5LiQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="renderer.js"></script>
+    <script type="module" src="renderer.js"></script>
 </body>
 </html>
