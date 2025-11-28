@@ -65,6 +65,25 @@ export class TabManager {
     }
   }
 
+  revealPassword(name) {
+    const entry = this.tabs.get(name);
+    if (!entry) return;
+    const secret = entry.content.querySelector('[data-secret]');
+    if (!secret) return;
+    secret.classList.add('revealed');
+    this.activate(name);
+  }
+
+  copyPassword(name) {
+    const entry = this.tabs.get(name);
+    if (!entry) return;
+    const secret = entry.content.querySelector('[data-secret]');
+    if (!secret) return;
+    navigator.clipboard.writeText(secret.textContent || '')
+      .then(() => this.logger?.success('Password copied'))
+      .catch(() => this.logger?.error('Failed to copy password'));
+  }
+
   handleTabClick(event) {
     const tabEl = event.target.closest('.editor-tab');
     if (!tabEl) return;

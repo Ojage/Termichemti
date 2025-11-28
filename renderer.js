@@ -8,6 +8,7 @@ import { AvailableNetworksController } from './renderer/controllers/availableNet
 import { ActivityBarController } from './renderer/controllers/activityBarController.js';
 import { setupConnectionIndicator } from './renderer/setup/connectionIndicator.js';
 import { setupSettingsPanel } from './renderer/setup/settingsPanel.js';
+import { CommandPalette } from './renderer/ui/commandPalette.js';
 
 function buildActivityBar(views, logger) {
   return new ActivityBarController(
@@ -66,7 +67,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const themeManager = new ThemeManager(document.getElementById('theme-select'), logger);
   await themeManager.init();
 
-  setupSettingsPanel();
+  const settingsPanel = setupSettingsPanel();
 
   const { wifiService, qrService } = buildServices(logger);
   const tabManager = buildTabManager(qrService, logger);
@@ -81,6 +82,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   activityBar.activate('explorer');
 
   setupConnectionIndicator(wifiService, logger);
+
+  new CommandPalette({
+    savedNetworks,
+    availableNetworks,
+    tabManager,
+    wifiService,
+    openSettings: settingsPanel?.open,
+    logger
+  });
 
   await savedNetworks.load();
   await availableNetworks.scan();

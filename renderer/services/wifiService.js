@@ -24,4 +24,8 @@ export class WifiService {
   async scanAvailableNetworks() {
     return window.api.scanAvailableNetworks();
   }
+
+  async connectToNetwork(options) {
+    return window.api.connectToNetwork(options);
+  }
 }
