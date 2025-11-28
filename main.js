@@ -339,6 +339,35 @@ function parseLinuxAvailableNetworks(stdout) {
     return uniqueNetworks.sort((a, b) => b.signal - a.signal);
 }
 
+function createWindowsProfileXml({ ssid, password, autoConnect, hidden }) {
+    return `<?xml version="1.0"?>
+<WLANProfile xmlns="http://www.microsoft.com/networking/WLAN/profile/v1">
+    <name>${ssid}</name>
+    <SSIDConfig>
+        <SSID>
+            <name>${ssid}</name>
+        </SSID>
+        <nonBroadcast>${hidden ? 'true' : 'false'}</nonBroadcast>
+    </SSIDConfig>
+    <connectionType>ESS</connectionType>
+    <connectionMode>${autoConnect ? 'auto' : 'manual'}</connectionMode>
+    <MSM>
+        <security>
+            <authEncryption>
+                <authentication>WPA2PSK</authentication>
+                <encryption>AES</encryption>
+                <useOneX>false</useOneX>
+            </authEncryption>
+            <sharedKey>
+                <keyType>passPhrase</keyType>
+                <protected>false</protected>
+                <keyMaterial>${password || ''}</keyMaterial>
+            </sharedKey>
+        </security>
+    </MSM>
+</WLANProfile>`;
+}
+
 // --- The Existing All-in-One IPC Handler ---
 ipcMain.handle('get-all-wifi-details', async () => {
     return new Promise((listResolve, listReject) => {
@@ -449,6 +478,110 @@ ipcMain.handle('scan-available-networks', async () => {
             });
         } else {
             return reject(`Unsupported OS: ${platform}`);
+        }
+    });
+});
+
+// --- Apply decrypted network profile and connect ---
+ipcMain.handle('apply-network-profile', async (event, payload = {}) => {
+    return new Promise((resolve) => {
+        const platform = process.platform;
+        if (platform !== 'win32' && platform !== 'linux') {
+            return resolve({ success: false, message: `Unsupported OS: ${platform}` });
+        }
+
+        const {
+            ssid,
+            password = '',
+            autoConnect = true,
+            hidden = false,
+            origin = 'renderer'
+        } = payload;
+
+        if (!ssid) {
+            return resolve({ success: false, message: 'SSID is required to apply a profile', origin });
+        }
+
+        if (platform === 'win32') {
+            const safeSsid = `${ssid}`.replace(/"/g, '');
+            const profileXml = createWindowsProfileXml({ ssid: safeSsid, password, autoConnect, hidden });
+            const profilePath = path.join(os.tmpdir(), `wifi_profile_${Date.now()}.xml`);
+
+            fs.writeFile(profilePath, profileXml, (writeError) => {
+                if (writeError) {
+                    return resolve({ success: false, message: `Failed to write profile: ${writeError.message}`, origin });
+                }
+
+                const addProfileCommand = `netsh wlan add profile filename="${profilePath}" user=all`;
+                const connectCommand = `netsh wlan connect name="${safeSsid}"`;
+
+                exec(addProfileCommand, (addError, addStdout, addStderr) => {
+                    try {
+                        fs.unlinkSync(profilePath);
+                    } catch (cleanupError) {
+                        console.warn('Failed to remove temporary profile file:', cleanupError.message);
+                    }
+
+                    if (addError) {
+                        return resolve({
+                            success: false,
+                            message: addStderr || addError.message,
+                            stdout: addStdout,
+                            origin,
+                            platform
+                        });
+                    }
+
+                    exec(connectCommand, (connectError, connectStdout, connectStderr) => {
+                        if (connectError) {
+                            return resolve({
+                                success: false,
+                                message: connectStderr || connectError.message,
+                                stdout: connectStdout,
+                                origin,
+                                platform
+                            });
+                        }
+
+                        return resolve({
+                            success: true,
+                            message: `Profile applied and connection attempted for ${safeSsid}`,
+                            stdout: connectStdout,
+                            origin,
+                            platform
+                        });
+                    });
+                });
+            });
+        } else {
+            const escapedSsid = `${ssid}`.replace(/"/g, '\\"');
+            const escapedPassword = `${password}`.replace(/"/g, '\\"');
+            const commandParts = [
+                `nmcli dev wifi connect "${escapedSsid}"`
+            ];
+
+            if (password) {
+                commandParts.push(`password "${escapedPassword}"`);
+            }
+
+            commandParts.push(`hidden ${hidden ? 'yes' : 'no'}`);
+            commandParts.push(`autoconnect ${autoConnect ? 'yes' : 'no'}`);
+
+            const connectCommand = commandParts.join(' ');
+
+            exec(connectCommand, (error, stdout, stderr) => {
+                if (error) {
+                    return resolve({ success: false, message: stderr || error.message, stdout, origin, platform });
+                }
+
+                return resolve({
+                    success: true,
+                    message: `Profile applied and connection attempted for ${ssid}`,
+                    stdout,
+                    origin,
+                    platform
+                });
+            });
         }
     });
 });

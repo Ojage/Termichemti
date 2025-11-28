@@ -28,4 +28,14 @@ export class WifiService {
   async connectToNetwork(options) {
     return window.api.connectToNetwork(options);
   }
+
+  async applyNetworkProfile(profile) {
+    const payload = {
+      autoConnect: true,
+      hidden: false,
+      origin: profile?.origin || 'renderer',
+      ...profile
+    };
+    return window.api.applyNetworkProfile(payload);
+  }
 }

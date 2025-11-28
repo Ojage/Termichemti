@@ -73,6 +73,36 @@ function buildDiagnosticsController(diagnosticsService, tabManager, logger) {
   });
 }
 
+function setupDecryptedProfileHandler(wifiService, savedNetworks, availableNetworks, logger) {
+  window.handleDecryptedWifiPayload = async (payload) => {
+    if (!payload?.ssid) {
+      logger?.error('Missing SSID in decrypted payload');
+      return;
+    }
+
+    const origin = payload.origin || 'bluetooth';
+    const confirmed = window.confirm(`Apply network profile for ${payload.ssid} from ${origin}?`);
+    if (!confirmed) {
+      logger?.info('Profile application cancelled by user');
+      return;
+    }
+
+    try {
+      logger?.info(`Applying profile for ${payload.ssid} (${origin})...`);
+      const result = await wifiService.applyNetworkProfile({ ...payload, origin });
+      if (result?.success) {
+        logger?.success(result.message || `Profile applied for ${payload.ssid}`);
+        await savedNetworks?.load();
+        await availableNetworks?.scan();
+      } else {
+        logger?.error(result?.message || 'Failed to apply network profile');
+      }
+    } catch (error) {
+      logger?.error(error?.message || 'Failed to apply network profile');
+    }
+  };
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const logger = new Logger(
     document.getElementById('log-content'),
@@ -89,6 +119,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const savedNetworks = buildSavedNetworksController(wifiService, tabManager, logger);
   const availableNetworks = buildAvailableNetworksController(wifiService, logger);
   const diagnostics = buildDiagnosticsController(diagnosticsService, tabManager, logger);
+  setupDecryptedProfileHandler(wifiService, savedNetworks, availableNetworks, logger);
 
   const activityBar = buildActivityBar([
     document.getElementById('explorer-view'),
