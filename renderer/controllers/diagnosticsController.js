@@ -17,6 +17,8 @@ export class DiagnosticsController {
     this.logger = logger;
     this.activeTool = null;
     this.isActive = false;
+    this.bluetoothEvents = [];
+    this.eventHistoryContainer = null;
 
     this.tools = [
       {
@@ -170,11 +172,60 @@ export class DiagnosticsController {
     wrapper.appendChild(header);
     wrapper.appendChild(content);
 
+    const activityCard = this.buildEventHistory();
+    wrapper.appendChild(activityCard);
+
     if (input) {
       input.focus();
     }
 
     return wrapper;
+  }
+
+  recordBluetoothEvent(event) {
+    this.bluetoothEvents.unshift({ ...event, timestamp: new Date() });
+    this.bluetoothEvents = this.bluetoothEvents.slice(0, 10);
+    this.updateEventHistory();
+  }
+
+  buildEventHistory() {
+    const card = document.createElement('div');
+    card.className = 'card diagnostic-events';
+    card.innerHTML = `<div class="card-header"><i class="fas fa-share-alt"></i> Bluetooth activity</div>`;
+
+    const body = document.createElement('div');
+    body.className = 'card-body diagnostic-events-body';
+    this.eventHistoryContainer = body;
+    this.updateEventHistory();
+
+    card.appendChild(body);
+    return card;
+  }
+
+  updateEventHistory() {
+    if (!this.eventHistoryContainer) return;
+    if (this.bluetoothEvents.length === 0) {
+      this.eventHistoryContainer.innerHTML = '<p class="muted">No Bluetooth activity recorded yet.</p>';
+      return;
+    }
+
+    const list = document.createElement('ul');
+    list.className = 'diagnostic-event-list';
+
+    this.bluetoothEvents.forEach((event) => {
+      const item = document.createElement('li');
+      item.className = `diagnostic-event ${event.status}`;
+      const time = event.timestamp instanceof Date ? event.timestamp.toLocaleTimeString() : '';
+      item.innerHTML = `
+        <div class="event-title"><strong>${event.type === 'share' ? 'Share' : 'Receive'}</strong> • ${event.ssid || 'Unknown SSID'}</div>
+        <div class="event-meta">${event.security || 'Unknown'} • ${event.encrypted ? 'Encrypted' : 'Unencrypted'} • ${event.status}</div>
+        <div class="event-time">${time}</div>
+      `;
+      list.appendChild(item);
+    });
+
+    this.eventHistoryContainer.innerHTML = '';
+    this.eventHistoryContainer.appendChild(list);
   }
 
   setRunning(button, isRunning) {

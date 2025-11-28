@@ -30,5 +30,11 @@ contextBridge.exposeInMainWorld('api', {
 
     // Theme Management
     getSystemTheme: () => ipcRenderer.invoke('get-system-theme'),
-    onThemeChanged: (callback) => ipcRenderer.on('theme-changed', (_event, theme) => callback(theme))
+    onThemeChanged: (callback) => ipcRenderer.on('theme-changed', (_event, theme) => callback(theme)),
+
+    // Bluetooth Sharing
+    shareNetworkBluetooth: (payload) => ipcRenderer.invoke('share-network-bluetooth', payload),
+    onBluetoothNetworkReceived: (callback) => ipcRenderer.on('bluetooth-network-received', (_event, payload) => callback(payload)),
+    respondToBluetoothOffer: (payload) => ipcRenderer.invoke('respond-to-bluetooth-offer', payload),
+    startBluetoothListener: () => ipcRenderer.invoke('start-bluetooth-listener')
 });

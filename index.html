@@ -264,6 +264,46 @@
         </div>
     </div>
 
+    <!-- Bluetooth Approval Modal -->
+    <div class="modal-overlay" id="bluetooth-modal-overlay">
+        <div class="modal-content bluetooth-modal" id="bluetooth-modal">
+            <div class="modal-header">
+                <h3>Bluetooth Share Request</h3>
+                <button class="modal-close" id="bluetooth-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="network-info">
+                    <div class="network-icon bluetooth">
+                        <i class="fas fa-bluetooth-b"></i>
+                    </div>
+                    <div class="network-details">
+                        <h4 id="bluetooth-ssid">Incoming Network</h4>
+                        <div class="network-meta">
+                            <span class="signal-strength" id="bluetooth-security">
+                                <i class="fas fa-lock"></i>
+                                <span>Unknown security</span>
+                            </span>
+                            <span class="security-type" id="bluetooth-encryption">Encryption unknown</span>
+                        </div>
+                    </div>
+                </div>
+                <p class="modal-description">A nearby device wants to share Wi-Fi credentials. Review the details and approve to import.</p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="bluetooth-decline">
+                        <i class="fas fa-ban"></i>
+                        Decline
+                    </button>
+                    <button type="button" class="btn-primary" id="bluetooth-accept">
+                        <i class="fas fa-check"></i>
+                        Approve
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Logging Panel -->
     <div class="log-panel-container">
         <div class="log-panel-header" id="log-panel-header">
@@ -274,6 +314,8 @@
             <!-- Logs will be injected here -->
         </div>
     </div>
+
+    <div id="toast-container" class="toast-container"></div>
 
     <script type="module" src="renderer.js"></script>
 </body>

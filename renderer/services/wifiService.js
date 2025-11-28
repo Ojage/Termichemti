@@ -8,6 +8,7 @@ export class WifiService {
     return records.map((record) => ({
       name: record.name,
       password: record.details?.password || null,
+      security: record.details?.authType || 'Unknown',
       fullDetails: record.details?.fullDetails || record.error || 'Unavailable'
     }));
   }
