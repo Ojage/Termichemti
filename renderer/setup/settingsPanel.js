@@ -10,4 +10,6 @@ export function setupSettingsPanel() {
   settingsBtn?.addEventListener('click', open);
   activityBtn?.addEventListener('click', open);
   closeBtn?.addEventListener('click', close);
+
+  return { open, close };
 }
