@@ -28,6 +28,15 @@ contextBridge.exposeInMainWorld('api', {
     getIpConfig: () => ipcRenderer.invoke('get-ip-config'),
     runSpeedTest: () => ipcRenderer.invoke('run-speed-test'),
 
+    // Bluetooth bridge
+    confirmBluetoothPermission: (approved) => ipcRenderer.invoke('bluetooth-confirm-session', approved),
+    startBluetoothAdvertising: (options) => ipcRenderer.invoke('bluetooth-start-advertising', options),
+    stopBluetoothAdvertising: () => ipcRenderer.invoke('bluetooth-stop-advertising'),
+    sendBluetoothPayload: (payload, options) => ipcRenderer.invoke('bluetooth-send-payload', payload, options),
+    onBluetoothReceived: (callback) => ipcRenderer.on('bluetooth-received', (_event, data) => callback(data)),
+    onBluetoothError: (callback) => ipcRenderer.on('bluetooth-error', (_event, error) => callback(error)),
+    onBluetoothWarning: (callback) => ipcRenderer.on('bluetooth-warning', (_event, warning) => callback(warning)),
+
     // Theme Management
     getSystemTheme: () => ipcRenderer.invoke('get-system-theme'),
     onThemeChanged: (callback) => ipcRenderer.on('theme-changed', (_event, theme) => callback(theme))

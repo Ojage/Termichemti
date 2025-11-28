@@ -4,9 +4,32 @@ const { exec } = require('node:child_process');
 const fs = require('fs');
 const os = require('os');
 const https = require('https');
+const { BluetoothService } = require('./main/bluetoothService');
 
 // Keep a global reference of the window object
 let mainWindow;
+const bluetoothService = new BluetoothService();
+
+bluetoothService.on('message', (payload) => {
+    if (mainWindow) {
+        mainWindow.webContents.send('bluetooth-received', {
+            payload,
+            receivedAt: Date.now()
+        });
+    }
+});
+
+bluetoothService.on('error', (error) => {
+    if (mainWindow) {
+        mainWindow.webContents.send('bluetooth-error', error);
+    }
+});
+
+bluetoothService.on('warning', (warning) => {
+    if (mainWindow) {
+        mainWindow.webContents.send('bluetooth-warning', warning);
+    }
+});
 
 function createWindow() {
     // Create the browser window
@@ -749,6 +772,23 @@ ipcMain.handle('run-speed-test', async () => {
 
         req.end();
     });
+});
+
+// --- Bluetooth IPC Handlers ---
+ipcMain.handle('bluetooth-confirm-session', async (_event, approved) => {
+    return bluetoothService.setRendererApproval(Boolean(approved));
+});
+
+ipcMain.handle('bluetooth-start-advertising', async (_event, options) => {
+    return bluetoothService.startAdvertising(options || {});
+});
+
+ipcMain.handle('bluetooth-stop-advertising', async () => {
+    return bluetoothService.stopAdvertising();
+});
+
+ipcMain.handle('bluetooth-send-payload', async (_event, payload, options) => {
+    return bluetoothService.sendSecurePayload(payload, options || {});
 });
 
 // --- OS Detection Handler ---
