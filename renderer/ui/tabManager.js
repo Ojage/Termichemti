@@ -5,6 +5,7 @@ export class TabManager {
     this.qrService = qrService;
     this.logger = logger;
     this.tabs = new Map();
+    this.activeName = null;
 
     this.tabsContainer?.addEventListener('click', (event) => this.handleTabClick(event));
   }
@@ -31,6 +32,7 @@ export class TabManager {
     this.replaceContent(content);
 
     this.tabs.set(network.name, { tab, content });
+    this.activeName = network.name;
     this.logger?.info(`Opened network ${network.name}`);
   }
 
@@ -48,6 +50,7 @@ export class TabManager {
     entry.tab.classList.add('active');
     entry.content.classList.add('active');
     this.replaceContent(entry.content);
+    this.activeName = name;
   }
 
   close(name) {
@@ -58,6 +61,7 @@ export class TabManager {
     this.tabs.delete(name);
 
     const last = Array.from(this.tabs.keys()).pop();
+    this.activeName = last || null;
     if (last) {
       this.activate(last);
     } else {
@@ -82,6 +86,15 @@ export class TabManager {
     navigator.clipboard.writeText(secret.textContent || '')
       .then(() => this.logger?.success('Password copied'))
       .catch(() => this.logger?.error('Failed to copy password'));
+  restoreActive() {
+    if (this.activeName && this.tabs.has(this.activeName)) {
+      this.activate(this.activeName);
+    } else if (this.tabs.size > 0) {
+      const last = Array.from(this.tabs.keys()).pop();
+      this.activate(last);
+    } else {
+      this.showEmptyState();
+    }
   }
 
   handleTabClick(event) {

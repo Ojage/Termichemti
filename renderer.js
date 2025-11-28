@@ -2,9 +2,11 @@ import { Logger } from './renderer/logger.js';
 import { ThemeManager } from './renderer/themeManager.js';
 import { WifiService } from './renderer/services/wifiService.js';
 import { QrCodeService } from './renderer/services/qrCodeService.js';
+import { DiagnosticsService } from './renderer/services/diagnosticsService.js';
 import { TabManager } from './renderer/ui/tabManager.js';
 import { SavedNetworksController } from './renderer/controllers/savedNetworksController.js';
 import { AvailableNetworksController } from './renderer/controllers/availableNetworksController.js';
+import { DiagnosticsController } from './renderer/controllers/diagnosticsController.js';
 import { ActivityBarController } from './renderer/controllers/activityBarController.js';
 import { setupConnectionIndicator } from './renderer/setup/connectionIndicator.js';
 import { setupSettingsPanel } from './renderer/setup/settingsPanel.js';
@@ -21,7 +23,8 @@ function buildActivityBar(views, logger) {
 function buildServices(logger) {
   return {
     wifiService: new WifiService(logger),
-    qrService: new QrCodeService(logger)
+    qrService: new QrCodeService(logger),
+    diagnosticsService: new DiagnosticsService(logger)
   };
 }
 
@@ -58,6 +61,18 @@ function buildAvailableNetworksController(wifiService, logger) {
   });
 }
 
+function buildDiagnosticsController(diagnosticsService, tabManager, logger) {
+  return new DiagnosticsController({
+    list: document.getElementById('diagnostics-list'),
+    searchInput: document.getElementById('diagnostics-search'),
+    content: document.getElementById('editor-content'),
+    tabsContainer: document.querySelector('.editor-tabs'),
+    tabManager,
+    diagnosticsService,
+    logger
+  });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const logger = new Logger(
     document.getElementById('log-content'),
@@ -69,16 +84,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const settingsPanel = setupSettingsPanel();
 
-  const { wifiService, qrService } = buildServices(logger);
+  const { wifiService, qrService, diagnosticsService } = buildServices(logger);
   const tabManager = buildTabManager(qrService, logger);
   const savedNetworks = buildSavedNetworksController(wifiService, tabManager, logger);
   const availableNetworks = buildAvailableNetworksController(wifiService, logger);
+  const diagnostics = buildDiagnosticsController(diagnosticsService, tabManager, logger);
 
   const activityBar = buildActivityBar([
     document.getElementById('explorer-view'),
     document.getElementById('available-view'),
     document.getElementById('diagnostics-view')
   ], logger);
+  activityBar.setOnChange((view) => {
+    if (view === 'diagnostics') {
+      diagnostics.enter();
+    } else {
+      diagnostics.exit();
+    }
+  });
   activityBar.activate('explorer');
 
   setupConnectionIndicator(wifiService, logger);
