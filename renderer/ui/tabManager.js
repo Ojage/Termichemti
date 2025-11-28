@@ -78,7 +78,7 @@ export class TabManager {
     this.activate(name);
   }
 
-  copyPassword(name) {
+  copyPasswordByName(name) {
     const entry = this.tabs.get(name);
     if (!entry) return;
     const secret = entry.content.querySelector('[data-secret]');
@@ -86,6 +86,8 @@ export class TabManager {
     navigator.clipboard.writeText(secret.textContent || '')
       .then(() => this.logger?.success('Password copied'))
       .catch(() => this.logger?.error('Failed to copy password'));
+  }
+
   restoreActive() {
     if (this.activeName && this.tabs.has(this.activeName)) {
       this.activate(this.activeName);
