@@ -108,17 +108,77 @@
                         <i class="fas fa-network-wired"></i>
                         <span>Ping Test</span>
                     </div>
+                    <div class="diagnostic-item" data-diagnostic="latency">
+                        <i class="fas fa-wave-square"></i>
+                        <span>Latency / Jitter Analyzer</span>
+                    </div>
                     <div class="diagnostic-item" data-diagnostic="dns">
                         <i class="fas fa-globe"></i>
                         <span>DNS Lookup</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="dns-benchmark">
+                        <i class="fas fa-bolt"></i>
+                        <span>DNS Benchmark</span>
                     </div>
                     <div class="diagnostic-item" data-diagnostic="ipconfig">
                         <i class="fas fa-laptop-code"></i>
                         <span>IP Configuration</span>
                     </div>
+                    <div class="diagnostic-item" data-diagnostic="ip-health">
+                        <i class="fas fa-stethoscope"></i>
+                        <span>IP Health Check</span>
+                    </div>
                     <div class="diagnostic-item" data-diagnostic="speedtest">
                         <i class="fas fa-tachometer-alt"></i>
                         <span>Speed Test</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="speed-estimate">
+                        <i class="fas fa-gauge-high"></i>
+                        <span>Speed Estimator</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="channel">
+                        <i class="fas fa-signal"></i>
+                        <span>Channel Congestion</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="band-detect">
+                        <i class="fas fa-wifi"></i>
+                        <span>Frequency Band</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="signal">
+                        <i class="fas fa-chart-area"></i>
+                        <span>Signal Stability</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="captive">
+                        <i class="fas fa-unlock-alt"></i>
+                        <span>Captive Portal Check</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="router">
+                        <i class="fas fa-route"></i>
+                        <span>Router Details</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="traceroute">
+                        <i class="fas fa-shoe-prints"></i>
+                        <span>Mini Traceroute</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="mtu">
+                        <i class="fas fa-arrows-alt-v"></i>
+                        <span>MTU Test</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="local-scan">
+                        <i class="fas fa-network-wired"></i>
+                        <span>Local Network Scan</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="port-check">
+                        <i class="fas fa-plug"></i>
+                        <span>Port Reachability</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="profile">
+                        <i class="fas fa-id-card-alt"></i>
+                        <span>Wi-Fi Profile Integrity</span>
+                    </div>
+                    <div class="diagnostic-item" data-diagnostic="smart">
+                        <i class="fas fa-brain"></i>
+                        <span>Smart Diagnosis Summary</span>
                     </div>
                 </div>
             </div>
@@ -264,6 +324,46 @@
         </div>
     </div>
 
+    <!-- Bluetooth Approval Modal -->
+    <div class="modal-overlay" id="bluetooth-modal-overlay">
+        <div class="modal-content bluetooth-modal" id="bluetooth-modal">
+            <div class="modal-header">
+                <h3>Bluetooth Share Request</h3>
+                <button class="modal-close" id="bluetooth-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="network-info">
+                    <div class="network-icon bluetooth">
+                        <i class="fas fa-bluetooth-b"></i>
+                    </div>
+                    <div class="network-details">
+                        <h4 id="bluetooth-ssid">Incoming Network</h4>
+                        <div class="network-meta">
+                            <span class="signal-strength" id="bluetooth-security">
+                                <i class="fas fa-lock"></i>
+                                <span>Unknown security</span>
+                            </span>
+                            <span class="security-type" id="bluetooth-encryption">Encryption unknown</span>
+                        </div>
+                    </div>
+                </div>
+                <p class="modal-description">A nearby device wants to share Wi-Fi credentials. Review the details and approve to import.</p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="bluetooth-decline">
+                        <i class="fas fa-ban"></i>
+                        Decline
+                    </button>
+                    <button type="button" class="btn-primary" id="bluetooth-accept">
+                        <i class="fas fa-check"></i>
+                        Approve
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Logging Panel -->
     <div class="log-panel-container">
         <div class="log-panel-header" id="log-panel-header">
@@ -274,6 +374,8 @@
             <!-- Logs will be injected here -->
         </div>
     </div>
+
+    <div id="toast-container" class="toast-container"></div>
 
     <script type="module" src="renderer.js"></script>
 </body>
