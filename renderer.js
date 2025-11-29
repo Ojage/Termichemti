@@ -107,6 +107,7 @@ function setupDecryptedProfileHandler(wifiService, savedNetworks, availableNetwo
       logger?.error(error?.message || 'Failed to apply network profile');
     }
   };
+}
 function setupBluetoothApprovals(bluetoothService, logger, diagnostics, toastManager) {
   const modal = document.getElementById('bluetooth-modal');
   const overlay = document.getElementById('bluetooth-modal-overlay');
@@ -191,9 +192,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const { wifiService, qrService, diagnosticsService, bluetoothService } = buildServices(logger);
   const tabManager = buildTabManager(qrService, logger);
   const diagnostics = buildDiagnosticsController(diagnosticsService, tabManager, logger);
-  setupDecryptedProfileHandler(wifiService, savedNetworks, availableNetworks, logger);
   const savedNetworks = buildSavedNetworksController(wifiService, bluetoothService, tabManager, logger, toastManager, diagnostics);
   const availableNetworks = buildAvailableNetworksController(wifiService, logger);
+  setupDecryptedProfileHandler(wifiService, savedNetworks, availableNetworks, logger);
 
   setupBluetoothApprovals(bluetoothService, logger, diagnostics, toastManager);
 

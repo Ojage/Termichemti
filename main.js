@@ -936,6 +936,7 @@ ipcMain.handle('respond-to-bluetooth-offer', async (_event, payload) => {
 ipcMain.handle('start-bluetooth-listener', async (event) => {
     bluetoothSubscribers.add(event.sender);
     return { listening: true };
+});
 // --- Bluetooth IPC Handlers ---
 ipcMain.handle('bluetooth-confirm-session', async (_event, approved) => {
     return bluetoothService.setRendererApproval(Boolean(approved));
@@ -951,6 +952,7 @@ ipcMain.handle('bluetooth-stop-advertising', async () => {
 
 ipcMain.handle('bluetooth-send-payload', async (_event, payload, options) => {
     return bluetoothService.sendSecurePayload(payload, options || {});
+});
 // 5. Latency, Jitter & Packet Loss Analyzer
 ipcMain.handle('run-latency-analyzer', async (_event, host = '8.8.8.8') => {
     return new Promise((resolve) => {

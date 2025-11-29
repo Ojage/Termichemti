@@ -53,11 +53,15 @@
   padding: 0;
 }
 
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background-color: var(--bg-color);
   color: var(--primary-text-color);
-  overflow: hidden;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -1275,6 +1279,14 @@ body {
 }
 
 .diagnostic-event-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .diagnostic-list {
   list-style: none;
   padding: 0;
@@ -1312,6 +1324,7 @@ body {
 .diagnostic-event .event-time {
   color: var(--secondary-text-color);
   font-size: 12px;
+}
 .diagnostic-list li {
   background: #181a1f;
   padding: 10px;
