@@ -3,8 +3,10 @@ const path = require('node:path');
 const { exec } = require('node:child_process');
 const fs = require('fs');
 const os = require('os');
+const http = require('http');
 const https = require('https');
 const { BluetoothService } = require('./main/bluetoothService');
+const net = require('net');
 
 // Keep a global reference of the window object
 let mainWindow;
@@ -789,6 +791,407 @@ ipcMain.handle('bluetooth-stop-advertising', async () => {
 
 ipcMain.handle('bluetooth-send-payload', async (_event, payload, options) => {
     return bluetoothService.sendSecurePayload(payload, options || {});
+// 5. Latency, Jitter & Packet Loss Analyzer
+ipcMain.handle('run-latency-analyzer', async (_event, host = '8.8.8.8') => {
+    return new Promise((resolve) => {
+        const platform = process.platform;
+        const command = platform === 'win32' ? `ping -n 12 ${host}` : `ping -c 12 ${host}`;
+
+        exec(command, (error, stdout, stderr) => {
+            const output = stdout || stderr || error?.message || 'No output';
+            const lines = output.split(/\r?\n/).filter(Boolean);
+            const timeRegex = /time[=<]([0-9.]+)/i;
+            const times = [];
+            lines.forEach((line) => {
+                const match = line.match(timeRegex);
+                if (match) times.push(parseFloat(match[1]));
+            });
+
+            const sentLine = lines.find((line) => /packets transmitted|Sent =/i.test(line)) || '';
+            const receivedLine = lines.find((line) => /received|Received =/i.test(line)) || '';
+            const sentMatch = sentLine.match(/(\d+)/);
+            const recvMatch = receivedLine.match(/(\d+)/);
+            const sent = sentMatch ? parseInt(sentMatch[1], 10) : times.length;
+            const received = recvMatch ? parseInt(recvMatch[1], 10) : times.length;
+            const loss = sent > 0 ? Math.max(0, ((sent - received) / sent) * 100) : 0;
+
+            const avg = times.length ? times.reduce((a, b) => a + b, 0) / times.length : null;
+            const max = times.length ? Math.max(...times) : null;
+            let jitter = null;
+            if (times.length > 1) {
+                const diffs = times.slice(1).map((t, idx) => Math.abs(t - times[idx]));
+                jitter = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+            }
+
+            resolve({
+                success: !error,
+                output,
+                stats: {
+                    avgLatency: avg,
+                    maxLatency: max,
+                    jitter,
+                    packetLoss: loss
+                }
+            });
+        });
+    });
+});
+
+// 6. Network Speed Estimator (Lightweight)
+ipcMain.handle('run-speed-estimator', async () => {
+    const targets = [
+        'https://speed.hetzner.de/100kB.bin',
+        'https://proof.ovh.net/files/100kB.dat'
+    ];
+
+    const downloadProbe = (url) =>
+        new Promise((resolve) => {
+            const start = Date.now();
+            let bytes = 0;
+            https
+                .get(url, (res) => {
+                    res.on('data', (chunk) => {
+                        bytes += chunk.length;
+                        if (bytes >= 500000) {
+                            res.destroy();
+                        }
+                    });
+                    res.on('end', () => {
+                        const seconds = (Date.now() - start) / 1000;
+                        const mbps = ((bytes * 8) / seconds / (1024 * 1024)).toFixed(2);
+                        resolve({ mbps: parseFloat(mbps), bytes, seconds, success: true });
+                    });
+                })
+                .on('error', (error) => resolve({ success: false, error: error.message }));
+        });
+
+    const results = await Promise.all(targets.map((url) => downloadProbe(url)));
+    const successful = results.filter((r) => r.success && r.mbps);
+    const average = successful.length
+        ? successful.reduce((sum, r) => sum + r.mbps, 0) / successful.length
+        : null;
+
+    return {
+        success: !!average,
+        results,
+        averageMbps: average,
+        message: average ? 'Lightweight probe complete' : 'Unable to estimate speed'
+    };
+});
+
+// 7. Wi-Fi Channel Congestion Scan
+ipcMain.handle('run-channel-scan', async () => {
+    return new Promise((resolve) => {
+        const platform = process.platform;
+        const command =
+            platform === 'win32'
+                ? 'netsh wlan show networks mode=bssid'
+                : 'nmcli --colors no -f SSID,FREQ,CHAN,IN-USE dev wifi list';
+
+        exec(command, (error, stdout, stderr) => {
+            const output = stdout || stderr || error?.message || '';
+            const counts = { c1: 0, c6: 0, c11: 0, band5: 0, band6: 0 };
+            const lines = output.split(/\r?\n/);
+            lines.forEach((line) => {
+                const channelMatch = line.match(/Channel\s*:\s*(\d+)/i) || line.match(/\s(\d{1,3})\s*$/);
+                const freqMatch = line.match(/(\d+\.\d)\s*GHz/);
+                const channel = channelMatch ? parseInt(channelMatch[1], 10) : null;
+                const freq = freqMatch ? parseFloat(freqMatch[1]) : null;
+                if (channel === 1) counts.c1 += 1;
+                if (channel === 6) counts.c6 += 1;
+                if (channel === 11) counts.c11 += 1;
+                if (freq && freq >= 5 && freq < 6) counts.band5 += 1;
+                if (freq && freq >= 6) counts.band6 += 1;
+            });
+
+            resolve({ success: !error, counts, output });
+        });
+    });
+});
+
+// 8. Frequency Band Detection & Router Info
+ipcMain.handle('run-band-detection', async () => {
+    return new Promise((resolve) => {
+        const platform = process.platform;
+        const command =
+            platform === 'win32'
+                ? 'netsh wlan show interfaces'
+                : 'nmcli --colors no -f ACTIVE,BSSID,SSID,FREQ,SIGNAL,RATE dev wifi show --active';
+
+        exec(command, (error, stdout, stderr) => {
+            const output = stdout || stderr || error?.message || '';
+            const freqMatch = output.match(/(\d+\.?\d*)\s*GHz/i);
+            const rateMatch = output.match(/(\d+\.?\d*)\s*Mb/);
+            const signalMatch = output.match(/Signal\s*:\s*(\d+)/i) || output.match(/SIGNAL:\s*(\d+)/i);
+            const bssidMatch = output.match(/BSSID\s*:\s*([0-9A-Fa-f:]+)/) || output.match(/BSSID:\s*([0-9A-Fa-f:]+)/);
+
+            let band = null;
+            const freq = freqMatch ? parseFloat(freqMatch[1]) : null;
+            if (freq) {
+                if (freq >= 2 && freq < 3) band = '2.4 GHz';
+                else if (freq >= 5 && freq < 6) band = '5 GHz';
+                else if (freq >= 6) band = '6 GHz';
+            }
+
+            resolve({
+                success: !!freq,
+                output,
+                band,
+                details: {
+                    frequency: freq,
+                    linkSpeed: rateMatch ? rateMatch[1] : null,
+                    signal: signalMatch ? signalMatch[1] : null,
+                    bssid: bssidMatch ? bssidMatch[1] : null
+                }
+            });
+        });
+    });
+});
+
+// 9. Signal Strength Stability Graph (10 seconds)
+ipcMain.handle('run-signal-stability', async () => {
+    const platform = process.platform;
+    const command =
+        platform === 'win32'
+            ? 'netsh wlan show interfaces'
+            : 'nmcli --colors no -f SIGNAL dev wifi show --active';
+
+    const sampleSignal = () =>
+        new Promise((resolve) => {
+            exec(command, (error, stdout, stderr) => {
+                const text = stdout || stderr || error?.message || '';
+                const match = text.match(/(\d+)\s*%/) || text.match(/SIGNAL:\s*(\d+)/);
+                resolve(match ? parseInt(match[1], 10) : null);
+            });
+        });
+
+    const samples = [];
+    for (let i = 0; i < 10; i++) {
+        // eslint-disable-next-line no-await-in-loop
+        const value = await sampleSignal();
+        samples.push({ tick: i + 1, signal: value });
+        // eslint-disable-next-line no-await-in-loop
+        await new Promise((r) => setTimeout(r, 1000));
+    }
+
+    return { success: samples.some((s) => s.signal !== null), samples };
+});
+
+// 10. Captive Portal Detection
+ipcMain.handle('run-captive-portal-check', async () => {
+    const checkHttp = () =>
+        new Promise((resolve) => {
+            http
+                .get('http://captive.apple.com', (res) => {
+                    resolve({ status: res.statusCode, location: res.headers.location });
+                })
+                .on('error', (error) => resolve({ error: error.message }));
+        });
+
+    const checkHttps = () =>
+        new Promise((resolve) => {
+            https
+                .get('https://example.com', (res) => {
+                    resolve({ status: res.statusCode, location: res.headers.location });
+                })
+                .on('error', (error) => resolve({ error: error.message }));
+        });
+
+    const [httpResult, httpsResult] = await Promise.all([checkHttp(), checkHttps()]);
+    const captive =
+        (httpResult.status && httpResult.status >= 300 && httpResult.status < 400) ||
+        httpResult.location ||
+        (httpsResult.status && httpsResult.status >= 300 && httpsResult.status < 400);
+
+    return { success: true, httpResult, httpsResult, captivePortalDetected: captive };
+});
+
+// 11. DNS Server Benchmark
+ipcMain.handle('run-dns-benchmark', async (_event, host = 'example.com') => {
+    const servers = [
+        { name: 'Current DNS', address: '' },
+        { name: 'Google', address: '8.8.8.8' },
+        { name: 'Cloudflare', address: '1.1.1.1' },
+        { name: 'Quad9', address: '9.9.9.9' }
+    ];
+
+    const runLookup = (server) =>
+        new Promise((resolve) => {
+            const serverArg = server.address ? `${server.address} ` : '';
+            const command = `nslookup ${host} ${serverArg}`;
+            const start = Date.now();
+            exec(command, (error, stdout, stderr) => {
+                const duration = Date.now() - start;
+                const output = stdout || stderr || error?.message || '';
+                resolve({
+                    name: server.name,
+                    server: server.address || 'System default',
+                    success: !error,
+                    duration,
+                    output
+                });
+            });
+        });
+
+    const results = [];
+    for (const server of servers) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await runLookup(server);
+        results.push(result);
+    }
+
+    const fastest = results
+        .filter((r) => r.success)
+        .sort((a, b) => a.duration - b.duration)
+        .shift();
+
+    return { success: results.some((r) => r.success), results, fastest };
+});
+
+// 12. IP Configuration Health Check
+ipcMain.handle('run-ip-health-check', async () => {
+    return new Promise((resolve) => {
+        const platform = process.platform;
+        const command = platform === 'win32' ? 'ipconfig /all' : 'ip addr';
+
+        exec(command, (error, stdout, stderr) => {
+            const output = stdout || stderr || error?.message || '';
+            const warnings = [];
+            if (/0\.0\.0\.0/.test(output)) warnings.push('Gateway appears to be 0.0.0.0');
+            if (/Media disconnected/i.test(output)) warnings.push('Some adapters are disconnected');
+            if (/Duplicate/i.test(output)) warnings.push('Potential duplicate IP detected');
+            if (/Autoconfiguration/i.test(output)) warnings.push('Autoconfiguration address in use');
+
+            resolve({ success: !error, output, warnings, status: warnings.length ? 'warning' : 'healthy' });
+        });
+    });
+});
+
+// 13. Router Information Extraction
+ipcMain.handle('run-router-info', async () => {
+    return new Promise((resolve) => {
+        const platform = process.platform;
+        const command =
+            platform === 'win32'
+                ? 'netsh wlan show interfaces'
+                : 'nmcli --colors no -f BSSID,SSID,CHAN,FREQ,RATE,SIGNAL dev wifi show --active';
+
+        exec(command, (error, stdout, stderr) => {
+            const output = stdout || stderr || error?.message || '';
+            const bssid = (output.match(/BSSID\s*:\s*([0-9A-Fa-f:]+)/) || output.match(/BSSID:\s*([0-9A-Fa-f:]+)/) || [])[1];
+            const rate = (output.match(/(\d+\.?\d*)\s*Mb/) || [])[1];
+            const signal = (output.match(/Signal\s*:\s*(\d+)/i) || output.match(/SIGNAL:\s*(\d+)/i) || [])[1];
+            const freq = (output.match(/(\d+\.?\d*)\s*GHz/i) || [])[1];
+            resolve({ success: !error, output, bssid, rate, signal, frequency: freq });
+        });
+    });
+});
+
+// 14. Internet Route Trace (Tracert/Traceroute)
+ipcMain.handle('run-mini-traceroute', async (_event, host = '8.8.8.8') => {
+    return new Promise((resolve) => {
+        const platform = process.platform;
+        const command = platform === 'win32' ? `tracert -h 5 ${host}` : `traceroute -m 5 ${host}`;
+        exec(command, (error, stdout, stderr) => {
+            const output = stdout || stderr || error?.message || '';
+            resolve({ success: !error, output });
+        });
+    });
+});
+
+// 15. MTU Test
+ipcMain.handle('run-mtu-test', async (_event, host = '8.8.8.8') => {
+    return new Promise((resolve) => {
+        const platform = process.platform;
+        const maxSizes = [1472, 1460, 1400, 1300];
+        const testSize = (size) =>
+            new Promise((res) => {
+                if (platform === 'win32') {
+                    exec(`ping -f -l ${size} -n 1 ${host}`, (error) => {
+                        res({ size, success: !error });
+                    });
+                } else {
+                    exec(`ping -M do -s ${size} -c 1 ${host}`, (error) => {
+                        res({ size, success: !error });
+                    });
+                }
+            });
+
+        const run = async () => {
+            for (const size of maxSizes) {
+                // eslint-disable-next-line no-await-in-loop
+                const result = await testSize(size);
+                if (!result.success) {
+                    return { size, success: false };
+                }
+            }
+            return { size: maxSizes[0], success: true };
+        };
+
+        run().then((result) => {
+            resolve({ success: result.success, breakpoint: result.size });
+        });
+    });
+});
+
+// 16. Local Network Scan (Optional)
+ipcMain.handle('run-local-scan', async () => {
+    return new Promise((resolve) => {
+        const command = process.platform === 'win32' ? 'arp -a' : 'arp -an';
+        exec(command, (error, stdout, stderr) => {
+            const output = stdout || stderr || error?.message || '';
+            const devices = (output.match(/\d+\.\d+\.\d+\.\d+/g) || []).length;
+            resolve({ success: !error, output, devices });
+        });
+    });
+});
+
+// 17. Firewall & Port Reachability Test
+ipcMain.handle('run-port-check', async (_event, host = '8.8.8.8') => {
+    const ports = [53, 80, 443, 22, 8080];
+    const testPort = (port) =>
+        new Promise((resolve) => {
+            const socket = net.createConnection({ host, port, timeout: 3000 });
+            socket.on('connect', () => {
+                socket.destroy();
+                resolve({ port, reachable: true });
+            });
+            socket.on('timeout', () => {
+                socket.destroy();
+                resolve({ port, reachable: false, reason: 'timeout' });
+            });
+            socket.on('error', (error) => {
+                socket.destroy();
+                resolve({ port, reachable: false, reason: error.code || error.message });
+            });
+        });
+
+    const results = [];
+    for (const port of ports) {
+        // eslint-disable-next-line no-await-in-loop
+        const result = await testPort(port);
+        results.push(result);
+    }
+    const blocked = results.filter((r) => !r.reachable);
+    return { success: true, results, blocked };
+});
+
+// 18. Wi-Fi Profile Integrity Check
+ipcMain.handle('run-wifi-profile-check', async () => {
+    return new Promise((resolve) => {
+        const platform = process.platform;
+        const command = platform === 'win32' ? 'netsh wlan show profiles' : 'nmcli connection show';
+        exec(command, (error, stdout, stderr) => {
+            const output = stdout || stderr || error?.message || '';
+            const duplicate = /\b(\S+)\b[\s\S]*\b\1\b/.test(output);
+            resolve({ success: !error, output, duplicateProfiles: duplicate });
+        });
+    });
+});
+
+// 19. Smart Diagnosis Summary
+ipcMain.handle('run-smart-summary', async () => {
+    return { success: true, message: 'Collecting latest diagnostics for summary...' };
 });
 
 // --- OS Detection Handler ---
