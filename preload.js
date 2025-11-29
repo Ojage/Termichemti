@@ -63,5 +63,8 @@ contextBridge.exposeInMainWorld('api', {
     shareNetworkBluetooth: (payload) => ipcRenderer.invoke('share-network-bluetooth', payload),
     onBluetoothNetworkReceived: (callback) => ipcRenderer.on('bluetooth-network-received', (_event, payload) => callback(payload)),
     respondToBluetoothOffer: (payload) => ipcRenderer.invoke('respond-to-bluetooth-offer', payload),
-    startBluetoothListener: () => ipcRenderer.invoke('start-bluetooth-listener')
+    startBluetoothListener: () => ipcRenderer.invoke('start-bluetooth-listener'),
+    getBluetoothState: () => ipcRenderer.invoke('get-bluetooth-state'),
+    enableBluetooth: () => ipcRenderer.invoke('enable-bluetooth'),
+    scanBluetoothPeers: () => ipcRenderer.invoke('scan-bluetooth-peers')
 });

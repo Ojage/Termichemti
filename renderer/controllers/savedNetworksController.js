@@ -1,5 +1,5 @@
 export class SavedNetworksController {
-  constructor({ tree, searchInput, refreshButton, status, wifiService, bluetoothService, tabs, logger, toastManager, diagnostics }) {
+  constructor({ tree, searchInput, refreshButton, status, wifiService, bluetoothService, tabs, logger, toastManager, diagnostics, bluetoothShareUi }) {
     this.tree = tree;
     this.searchInput = searchInput;
     this.refreshButton = refreshButton;
@@ -10,6 +10,7 @@ export class SavedNetworksController {
     this.logger = logger;
     this.toastManager = toastManager;
     this.diagnostics = diagnostics;
+    this.bluetoothShareUi = bluetoothShareUi;
     this.networks = [];
 
     this.refreshButton?.addEventListener('click', () => this.load());
@@ -53,7 +54,9 @@ export class SavedNetworksController {
           <span class="tree-item-subtitle">${network.password ? 'Password stored' : 'No password'} • ${network.security || 'Unknown'} security</span>
         </div>
         <div class="tree-item-actions">
-          <button class="ghost-btn ghost-btn-compact" data-action="share" data-name="${network.name}"><i class="fas fa-bluetooth-b"></i> Share via Bluetooth</button>
+          <button class="ghost-btn ghost-btn-compact bluetooth-share-btn" title="Share via Bluetooth" data-action="share" data-name="${network.name}">
+            <i class="fas fa-bluetooth-b"></i>
+          </button>
         </div>
       </div>
     `).join('');
@@ -83,49 +86,6 @@ export class SavedNetworksController {
 
   async shareNetwork(network) {
     if (!network) return;
-    const toast = this.toastManager?.show(`Sharing ${network.name} over Bluetooth...`, 'info', { spinner: true, duration: 0 });
-    this.logger?.info(`Preparing Bluetooth share for ${network.name} (${network.security || 'Unknown'}; encrypted=${network.password ? 'yes' : 'no'})`);
-    this.diagnostics?.recordBluetoothEvent?.({
-      type: 'share',
-      ssid: network.name,
-      security: network.security,
-      encrypted: Boolean(network.password),
-      status: 'pending'
-    });
-
-    try {
-      const result = await this.bluetoothService?.shareNetwork(network);
-      if (result?.success) {
-        toast?.update(`Shared ${network.name} via Bluetooth`, 'success');
-        this.logger?.success(`Shared ${network.name} via Bluetooth (${network.security || 'Unknown'})`);
-        this.diagnostics?.recordBluetoothEvent?.({
-          type: 'share',
-          ssid: network.name,
-          security: network.security,
-          encrypted: Boolean(network.password),
-          status: 'success'
-        });
-      } else {
-        toast?.update(result?.message || `Failed to share ${network.name}`, 'error');
-        this.logger?.error(`Bluetooth share failed for ${network.name}: ${result?.message || 'Unknown error'}`);
-        this.diagnostics?.recordBluetoothEvent?.({
-          type: 'share',
-          ssid: network.name,
-          security: network.security,
-          encrypted: Boolean(network.password),
-          status: 'failed'
-        });
-      }
-    } catch (error) {
-      toast?.update(`Bluetooth share failed: ${error.message || error}`, 'error');
-      this.logger?.error(`Bluetooth share failed for ${network.name}: ${error.message || error}`);
-      this.diagnostics?.recordBluetoothEvent?.({
-        type: 'share',
-        ssid: network.name,
-        security: network.security,
-        encrypted: Boolean(network.password),
-        status: 'failed'
-      });
-    }
+    await this.bluetoothShareUi?.share(network);
   }
 }

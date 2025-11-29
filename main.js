@@ -9,6 +9,7 @@ const { BluetoothService } = require('./main/bluetoothService');
 const net = require('net');
 
 const bluetoothSubscribers = new Set();
+let bluetoothEnabled = true;
 
 // Keep a global reference of the window object
 let mainWindow;
@@ -923,9 +924,18 @@ ipcMain.handle('run-speed-test', async () => {
 
 // --- Bluetooth Sharing & Intake ---
 ipcMain.handle('share-network-bluetooth', async (_event, payload) => {
+    if (!bluetoothEnabled) {
+        return { success: false, message: 'Bluetooth is disabled' };
+    }
     // Placeholder implementation; replace with OS-level Bluetooth APIs as available.
     console.info('Bluetooth share requested:', payload);
-    return { success: true, encrypted: payload.encrypted, ssid: payload.ssid, security: payload.security };
+    return {
+        success: true,
+        encrypted: payload.encrypted,
+        ssid: payload.ssid,
+        security: payload.security,
+        target: payload?.target
+    };
 });
 
 ipcMain.handle('respond-to-bluetooth-offer', async (_event, payload) => {
@@ -936,6 +946,126 @@ ipcMain.handle('respond-to-bluetooth-offer', async (_event, payload) => {
 ipcMain.handle('start-bluetooth-listener', async (event) => {
     bluetoothSubscribers.add(event.sender);
     return { listening: true };
+});
+
+ipcMain.handle('get-bluetooth-state', async () => {
+    await bluetoothService.backendReady;
+    const supported = Boolean(bluetoothService.adapter);
+    return {
+        supported,
+        enabled: bluetoothEnabled,
+        mock: !supported || !bluetoothService.adapter?.startAdvertising
+    };
+});
+
+ipcMain.handle('enable-bluetooth', async () => {
+    bluetoothEnabled = true;
+    return { enabled: bluetoothEnabled };
+});
+
+ipcMain.handle('scan-bluetooth-peers', async () => {
+    if (!bluetoothEnabled) {
+        return { success: false, message: 'Bluetooth is disabled' };
+    }
+
+    await bluetoothService.backendReady;
+    const supported = Boolean(bluetoothService.adapter);
+
+    const peers = [];
+    let canDiscover = false;
+    if (supported && bluetoothService.adapter) {
+        const adapter = bluetoothService.adapter;
+        const normalizePeer = (device, index) => {
+            if (!device) return null;
+            const id = device.id || device.address || device.mac || device.uuid || device.name || `device-${index + 1}`;
+            const rssi = typeof device.rssi === 'number' ? device.rssi : (typeof device.signal === 'number' ? device.signal : device.strength);
+            const strength = typeof rssi === 'number' ? Math.max(0, Math.min(100, 2 * (rssi + 100))) : undefined;
+            return {
+                id,
+                name: device.name || device.friendlyName || device.alias || id,
+                strength: typeof strength === 'number' ? Math.round(strength) : undefined
+            };
+        };
+
+        const collectPeers = (items) => {
+            if (!Array.isArray(items)) return;
+            items.forEach((device, idx) => {
+                const peer = normalizePeer(device, peers.length + idx);
+                if (peer) {
+                    peers.push(peer);
+                }
+            });
+        };
+
+        const discoverWithEvents = () => new Promise((resolve) => {
+            const discovered = [];
+            const handler = (address, name, rssi) => discovered.push({ address, name, rssi });
+            const finish = () => {
+                cleanup();
+                resolve(discovered);
+            };
+            const cleanup = () => {
+                if (typeof adapter.off === 'function') {
+                    adapter.off('found', handler);
+                    adapter.off('finished', finish);
+                    adapter.off('error', finish);
+                } else if (typeof adapter.removeListener === 'function') {
+                    adapter.removeListener('found', handler);
+                    adapter.removeListener('finished', finish);
+                    adapter.removeListener('error', finish);
+                }
+            };
+            const timer = setTimeout(finish, 5000);
+            const safeFinish = () => {
+                clearTimeout(timer);
+                finish();
+            };
+            (adapter.on || adapter.addListener)?.call(adapter, 'found', handler);
+            (adapter.on || adapter.addListener)?.call(adapter, 'finished', safeFinish);
+            (adapter.on || adapter.addListener)?.call(adapter, 'error', safeFinish);
+            try {
+                (adapter.inquire || adapter.startInquiry)?.call(adapter);
+            } catch (error) {
+                clearTimeout(timer);
+                cleanup();
+                resolve(discovered);
+            }
+        });
+
+        canDiscover = typeof adapter.discoverDevices === 'function'
+            || typeof adapter.listDevices === 'function'
+            || typeof adapter.scan === 'function'
+            || typeof adapter.inquire === 'function'
+            || typeof adapter.startInquiry === 'function';
+
+        if (canDiscover) {
+            try {
+                if (typeof adapter.discoverDevices === 'function') {
+                    collectPeers(await adapter.discoverDevices());
+                } else if (typeof adapter.listDevices === 'function') {
+                    collectPeers(await adapter.listDevices());
+                } else if (typeof adapter.scan === 'function') {
+                    collectPeers(await adapter.scan());
+                } else {
+                    collectPeers(await discoverWithEvents());
+                }
+            } catch (error) {
+                return {
+                    success: false,
+                    peers: [],
+                    mock: !supported || !canDiscover,
+                    message: `Bluetooth scan failed: ${error.message}`
+                };
+            }
+        }
+    }
+
+    return {
+        success: true,
+        peers,
+        mock: !supported || !canDiscover,
+        message: supported ? (peers.length ? `Found ${peers.length} device(s)` : 'No devices found') : 'Bluetooth adapter not available'
+    };
 });
 // --- Bluetooth IPC Handlers ---
 ipcMain.handle('bluetooth-confirm-session', async (_event, approved) => {

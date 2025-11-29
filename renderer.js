@@ -42,7 +42,7 @@ function buildTabManager(qrService, logger) {
   return tabs;
 }
 
-function buildSavedNetworksController(wifiService, bluetoothService, tabs, logger, toastManager, diagnostics) {
+function buildSavedNetworksController(wifiService, bluetoothService, tabs, logger, toastManager, diagnostics, bluetoothShareUi) {
   return new SavedNetworksController({
     tree: document.getElementById('explorer-tree'),
     searchInput: document.getElementById('explorer-search'),
@@ -53,7 +53,8 @@ function buildSavedNetworksController(wifiService, bluetoothService, tabs, logge
     tabs,
     logger,
     toastManager,
-    diagnostics
+    diagnostics,
+    bluetoothShareUi
   });
 }
 
@@ -176,6 +177,197 @@ function setupBluetoothApprovals(bluetoothService, logger, diagnostics, toastMan
   });
 }
 
+function setupBluetoothShareFlow(bluetoothService, toastManager, logger, diagnostics) {
+  const enableOverlay = document.getElementById('bluetooth-enable-overlay');
+  const enableConfirm = document.getElementById('bluetooth-enable-confirm');
+  const enableCancel = document.getElementById('bluetooth-enable-cancel');
+  const enableClose = document.getElementById('bluetooth-enable-close');
+  const sendOverlay = document.getElementById('bluetooth-send-overlay');
+  const peerList = document.getElementById('bluetooth-peer-list');
+  const rescanBtn = document.getElementById('bluetooth-rescan-peers');
+  const sendBtn = document.getElementById('bluetooth-send-btn');
+  const cancelSendBtn = document.getElementById('bluetooth-send-cancel');
+  const closeSendBtn = document.getElementById('bluetooth-send-close');
+  const scanStatus = document.getElementById('bluetooth-scan-status');
+
+  const toggle = (el, show) => el?.classList[show ? 'add' : 'remove']('show');
+
+  const waitForEnable = () =>
+    new Promise((resolve) => {
+      if (!enableOverlay) return resolve(true);
+      const handleConfirm = async () => {
+        cleanup();
+        try {
+          const result = await bluetoothService.enable();
+          resolve(Boolean(result?.enabled));
+        } catch (error) {
+          logger?.error(error?.message || 'Failed to enable Bluetooth');
+          resolve(false);
+        }
+      };
+      const handleCancel = () => {
+        cleanup();
+        resolve(false);
+      };
+      const cleanup = () => {
+        enableConfirm?.removeEventListener('click', handleConfirm);
+        enableCancel?.removeEventListener('click', handleCancel);
+        enableClose?.removeEventListener('click', handleCancel);
+        toggle(enableOverlay, false);
+      };
+      enableConfirm?.addEventListener('click', handleConfirm);
+      enableCancel?.addEventListener('click', handleCancel);
+      enableClose?.addEventListener('click', handleCancel);
+      toggle(enableOverlay, true);
+    });
+
+  const renderPeers = (peers = []) => {
+    if (!peerList) return;
+    if (!peers.length) {
+      peerList.innerHTML = '<li class="peer-empty">No nearby Termichemti devices found.</li>';
+      return;
+    }
+    peerList.innerHTML = peers
+      .map(
+        (peer, index) => `
+        <li class="peer-item">
+          <label>
+            <input type="radio" name="peer" value="${peer.id}" data-name="${peer.name || 'Unknown device'}" ${index === 0 ? 'checked' : ''}/>
+            <span class="peer-meta">
+              <i class="fas fa-bluetooth-b"></i>
+              <span class="peer-name">${peer.name || 'Unknown device'}</span>
+              <span class="peer-strength">${peer.strength ? `${peer.strength}%` : ''}</span>
+            </span>
+          </label>
+        </li>`
+      )
+      .join('');
+  };
+
+  const pickPeer = async () => {
+    if (!sendOverlay) return null;
+    toggle(sendOverlay, true);
+    scanStatus.textContent = 'Scanning nearby devices...';
+    sendBtn.disabled = true;
+
+    const runScan = async () => {
+      try {
+        const result = await bluetoothService.scanPeers();
+        if (result?.success) {
+          const count = result.peers?.length || 0;
+          scanStatus.textContent = count > 0 ? `Found ${count} device(s).` : (result.message || 'No devices found.');
+          renderPeers(result.peers || []);
+          sendBtn.disabled = count === 0;
+        } else {
+          scanStatus.textContent = result?.message || 'Scan failed.';
+          renderPeers([]);
+          sendBtn.disabled = true;
+        }
+      } catch (error) {
+        scanStatus.textContent = error?.message || 'Scan failed.';
+        renderPeers([]);
+        sendBtn.disabled = true;
+      }
+    };
+
+    await runScan();
+
+    const peersPromise = new Promise((resolve) => {
+      const handleSend = () => {
+        const selected = sendOverlay.querySelector('input[name="peer"]:checked');
+        cleanup();
+        resolve(selected ? { id: selected.value, name: selected.dataset?.name } : null);
+      };
+      const handleCancel = () => {
+        cleanup();
+        resolve(null);
+      };
+      const handleRescan = async () => {
+        sendBtn.disabled = true;
+        scanStatus.textContent = 'Rescanning...';
+        await runScan();
+      };
+
+      const cleanup = () => {
+        sendBtn?.removeEventListener('click', handleSend);
+        cancelSendBtn?.removeEventListener('click', handleCancel);
+        closeSendBtn?.removeEventListener('click', handleCancel);
+        rescanBtn?.removeEventListener('click', handleRescan);
+        toggle(sendOverlay, false);
+      };
+
+      sendBtn?.addEventListener('click', handleSend);
+      cancelSendBtn?.addEventListener('click', handleCancel);
+      closeSendBtn?.addEventListener('click', handleCancel);
+      rescanBtn?.addEventListener('click', handleRescan);
+    });
+
+    return peersPromise;
+  };
+
+  return {
+    share: async (network) => {
+      const state = await bluetoothService.getState();
+      if (!state?.supported) {
+        toastManager?.show('Bluetooth is not available on this device.', 'error');
+        return;
+      }
+
+      if (!state.enabled) {
+        const enabled = await waitForEnable();
+        if (!enabled) {
+          toastManager?.show('Bluetooth sharing cancelled (Bluetooth off).', 'warning');
+          return;
+        }
+      }
+
+      const peer = await pickPeer();
+      if (!peer) return;
+
+      const toast = toastManager?.show(`Sending ${network.name} via Bluetooth...`, 'info', { spinner: true, duration: 0 });
+      diagnostics?.recordBluetoothEvent?.({
+        type: 'share',
+        ssid: network.name,
+        security: network.security,
+        encrypted: Boolean(network.password),
+        status: 'pending'
+      });
+
+      try {
+        const result = await bluetoothService.shareNetwork(network, peer.id);
+        if (result?.success) {
+          toast?.update(`Sent to ${peer.name || 'device'}`, 'success');
+          diagnostics?.recordBluetoothEvent?.({
+            type: 'share',
+            ssid: network.name,
+            security: network.security,
+            encrypted: Boolean(network.password),
+            status: 'success'
+          });
+        } else {
+          toast?.update(result?.message || 'Bluetooth send failed', 'error');
+          diagnostics?.recordBluetoothEvent?.({
+            type: 'share',
+            ssid: network.name,
+            security: network.security,
+            encrypted: Boolean(network.password),
+            status: 'failed'
+          });
+        }
+      } catch (error) {
+        toast?.update(error?.message || 'Bluetooth send failed', 'error');
+        diagnostics?.recordBluetoothEvent?.({
+          type: 'share',
+          ssid: network.name,
+          security: network.security,
+          encrypted: Boolean(network.password),
+          status: 'failed'
+        });
+      }
+    }
+  };
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const logger = new Logger(
     document.getElementById('log-content'),
@@ -192,7 +384,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const { wifiService, qrService, diagnosticsService, bluetoothService } = buildServices(logger);
   const tabManager = buildTabManager(qrService, logger);
   const diagnostics = buildDiagnosticsController(diagnosticsService, tabManager, logger);
-  const savedNetworks = buildSavedNetworksController(wifiService, bluetoothService, tabManager, logger, toastManager, diagnostics);
+  const bluetoothShareUi = setupBluetoothShareFlow(bluetoothService, toastManager, logger, diagnostics);
+  const savedNetworks = buildSavedNetworksController(wifiService, bluetoothService, tabManager, logger, toastManager, diagnostics, bluetoothShareUi);
   const availableNetworks = buildAvailableNetworksController(wifiService, logger);
   setupDecryptedProfileHandler(wifiService, savedNetworks, availableNetworks, logger);
 

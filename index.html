@@ -364,6 +364,54 @@
         </div>
     </div>
 
+    <!-- Bluetooth Enable Prompt -->
+    <div class="modal-overlay" id="bluetooth-enable-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Enable Bluetooth</h3>
+                <button class="modal-close" id="bluetooth-enable-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p>Bluetooth is turned off. Turn it on to share this network securely with nearby Termichemti users.</p>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="bluetooth-enable-cancel">Cancel</button>
+                    <button type="button" class="btn-primary" id="bluetooth-enable-confirm">
+                        <i class="fas fa-bluetooth-b"></i>
+                        Enable Bluetooth
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bluetooth Send Modal -->
+    <div class="modal-overlay" id="bluetooth-send-overlay">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Send via Bluetooth</h3>
+                <button class="modal-close" id="bluetooth-send-close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="bluetooth-scan-status">Scanning nearby devices...</p>
+                <ul class="bluetooth-peer-list" id="bluetooth-peer-list"></ul>
+                <div class="modal-actions">
+                    <button type="button" class="btn-secondary" id="bluetooth-rescan-peers">
+                        <i class="fas fa-sync-alt"></i>
+                        Rescan
+                    </button>
+                    <button type="button" class="btn-primary" id="bluetooth-send-btn">
+                        <i class="fas fa-paper-plane"></i>
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Logging Panel -->
     <div class="log-panel-container">
         <div class="log-panel-header" id="log-panel-header">
