@@ -8,6 +8,8 @@ const https = require('https');
 const { BluetoothService } = require('./main/bluetoothService');
 const net = require('net');
 
+const bluetoothSubscribers = new Set();
+
 // Keep a global reference of the window object
 let mainWindow;
 const bluetoothService = new BluetoothService();
@@ -185,6 +187,16 @@ function parseAvailableNetworks(stdout, platform) {
     }, []);
 
     return uniqueNetworks.sort((a, b) => b.signal - a.signal);
+}
+
+function broadcastBluetoothOffer(payload) {
+    for (const subscriber of bluetoothSubscribers) {
+        try {
+            subscriber.send('bluetooth-network-received', payload);
+        } catch (error) {
+            console.warn('Failed to notify renderer of Bluetooth offer:', error);
+        }
+    }
 }
 
 // --- Parse Windows available networks ---
@@ -776,6 +788,21 @@ ipcMain.handle('run-speed-test', async () => {
     });
 });
 
+// --- Bluetooth Sharing & Intake ---
+ipcMain.handle('share-network-bluetooth', async (_event, payload) => {
+    // Placeholder implementation; replace with OS-level Bluetooth APIs as available.
+    console.info('Bluetooth share requested:', payload);
+    return { success: true, encrypted: payload.encrypted, ssid: payload.ssid, security: payload.security };
+});
+
+ipcMain.handle('respond-to-bluetooth-offer', async (_event, payload) => {
+    console.info('Bluetooth offer response:', payload);
+    return { success: true, approved: payload.approved };
+});
+
+ipcMain.handle('start-bluetooth-listener', async (event) => {
+    bluetoothSubscribers.add(event.sender);
+    return { listening: true };
 // --- Bluetooth IPC Handlers ---
 ipcMain.handle('bluetooth-confirm-session', async (_event, approved) => {
     return bluetoothService.setRendererApproval(Boolean(approved));
