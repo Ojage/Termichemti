@@ -1275,6 +1275,7 @@ body {
 }
 
 .diagnostic-event-list {
+.diagnostic-list {
   list-style: none;
   padding: 0;
   margin: 0;
@@ -1311,6 +1312,39 @@ body {
 .diagnostic-event .event-time {
   color: var(--secondary-text-color);
   font-size: 12px;
+.diagnostic-list li {
+  background: #181a1f;
+  padding: 10px;
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--primary-text-color);
+}
+
+.diagnostic-list .badge {
+  margin-left: 8px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  color: #fff;
+}
+
+.badge-green {
+  background: #2ecc71;
+}
+
+.badge-yellow {
+  background: #f1c40f;
+  color: #111;
+}
+
+.badge-red {
+  background: #e74c3c;
+}
+
+.badge-gray {
+  background: #7f8c8d;
 }
 
 /* === Settings Panel === */
