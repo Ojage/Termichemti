@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld('api', {
     // Connect to a network
     connectToNetwork: (networkData) => ipcRenderer.invoke('connect-to-network', networkData),
 
+    // Apply a decrypted network profile and connect
+    applyNetworkProfile: (profileData) => ipcRenderer.invoke('apply-network-profile', profileData),
+
     // Get current connection status
     getConnectionStatus: () => ipcRenderer.invoke('get-connection-status'),
 

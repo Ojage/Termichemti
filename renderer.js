@@ -79,6 +79,34 @@ function buildDiagnosticsController(diagnosticsService, tabManager, logger) {
   });
 }
 
+function setupDecryptedProfileHandler(wifiService, savedNetworks, availableNetworks, logger) {
+  window.handleDecryptedWifiPayload = async (payload) => {
+    if (!payload?.ssid) {
+      logger?.error('Missing SSID in decrypted payload');
+      return;
+    }
+
+    const origin = payload.origin || 'bluetooth';
+    const confirmed = window.confirm(`Apply network profile for ${payload.ssid} from ${origin}?`);
+    if (!confirmed) {
+      logger?.info('Profile application cancelled by user');
+      return;
+    }
+
+    try {
+      logger?.info(`Applying profile for ${payload.ssid} (${origin})...`);
+      const result = await wifiService.applyNetworkProfile({ ...payload, origin });
+      if (result?.success) {
+        logger?.success(result.message || `Profile applied for ${payload.ssid}`);
+        await savedNetworks?.load();
+        await availableNetworks?.scan();
+      } else {
+        logger?.error(result?.message || 'Failed to apply network profile');
+      }
+    } catch (error) {
+      logger?.error(error?.message || 'Failed to apply network profile');
+    }
+  };
 function setupBluetoothApprovals(bluetoothService, logger, diagnostics, toastManager) {
   const modal = document.getElementById('bluetooth-modal');
   const overlay = document.getElementById('bluetooth-modal-overlay');
@@ -163,6 +191,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const { wifiService, qrService, diagnosticsService, bluetoothService } = buildServices(logger);
   const tabManager = buildTabManager(qrService, logger);
   const diagnostics = buildDiagnosticsController(diagnosticsService, tabManager, logger);
+  setupDecryptedProfileHandler(wifiService, savedNetworks, availableNetworks, logger);
   const savedNetworks = buildSavedNetworksController(wifiService, bluetoothService, tabManager, logger, toastManager, diagnostics);
   const availableNetworks = buildAvailableNetworksController(wifiService, logger);
 
